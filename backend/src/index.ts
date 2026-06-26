@@ -16,7 +16,6 @@ export type {
   RouteComparison,
   ComparisonEntry,
   LocationService,
-  RouteService,
   RouteRankingEngine,
 } from './domain/models.js';
 
@@ -73,3 +72,63 @@ export {
 } from './infra/cache.js';
 
 export type { TtlLruCacheOptions } from './infra/cache.js';
+
+// Location autocomplete service (short-query guard, caching, 10-result cap).
+export { DefaultLocationService, MIN_QUERY_LENGTH } from './services/locationService.js';
+export type { StopFinderClient } from './services/locationService.js';
+
+// Route discovery, ranking, and comparison service (orchestrates the TfNSW
+// client + cache + pure ranking engine).
+export { RouteService } from './services/routeService.js';
+export type {
+  RoutePlanningClient,
+  RouteServiceOptions,
+} from './services/routeService.js';
+
+// API middleware: HTTP-agnostic input validation/allowlisting, an in-memory
+// per-IP + global rate limiter, and CORS header derivation (mounted by the
+// REST layer in task 9.2).
+export {
+  QUERY_MIN_LENGTH,
+  QUERY_MAX_LENGTH,
+  LOCATION_ID_PATTERN,
+  validateLocationQuery,
+  validateRouteParams,
+  createRateLimiter,
+  parseAllowedOrigins,
+  corsHeaders,
+} from './api/middleware.js';
+
+export type {
+  QueryParams,
+  ValidatedLocationQuery,
+  RateLimiterOptions,
+  RateLimitResult,
+  RateLimiter,
+} from './api/middleware.js';
+
+// REST controllers: the framework-agnostic routing core, the Node `http`
+// adapter, and the Cache-Control max-age constants (mounted by `server.ts`).
+export {
+  handleApiRequest,
+  createNodeRequestListener,
+  LOCATIONS_MAX_AGE_SECONDS,
+  ROUTES_MAX_AGE_SECONDS,
+} from './api/routes.js';
+
+export type {
+  ApiRequestContext,
+  ApiResponse,
+  RouteHandlerDeps,
+} from './api/routes.js';
+
+// Composition root + HTTP server bootstrap (config loading, dependency graph,
+// server construction/start).
+export {
+  loadConfig,
+  buildDependencies,
+  buildServer,
+  startServer,
+} from './server.js';
+
+export type { ServerConfig } from './server.js';

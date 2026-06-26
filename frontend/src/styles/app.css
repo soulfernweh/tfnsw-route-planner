@@ -60,6 +60,21 @@
   font-size: 1rem;
 }
 
+/* Stacked origin/destination inputs with comfortable spacing. */
+.app-search-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+/* Comparison + detail stack vertically within the results region. */
+.app-results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
 .app-placeholder {
   color: var(--color-text-muted);
   font-size: 0.875rem;

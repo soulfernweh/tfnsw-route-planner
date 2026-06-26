@@ -163,44 +163,44 @@ All property tests use a mature PBT library (`fast-check`), run a minimum of 100
     - Test key normalisation, hit on repeat call, and expiry after TTL
     - _Requirements: Design "Caching Strategy"_
 
-- [ ] 8. Implement the Location and Route services
-  - [-] 8.1 Implement `LocationService.searchLocations`
+- [x] 8. Implement the Location and Route services
+  - [x] 8.1 Implement `LocationService.searchLocations`
     - Create `backend/src/services/locationService.ts`: guard trimmed query length < 3 (return empty, do not call client), otherwise call cached `TfnswClient.stopFinder` and return up to 10 `Location[]`
     - _Requirements: 1.1, 1.4, 1.6_
 
-  - [ ]* 8.2 Write property test for short-query guard
+  - [x]* 8.2 Write property test for short-query guard
     - **Property 3: Short queries never reach the API**
     - **Validates: Requirements 1.6**
 
-  - [-] 8.3 Implement `RouteService.planRoutes`
+  - [x] 8.3 Implement `RouteService.planRoutes`
     - Create `backend/src/services/routeService.ts`: validate `originId !== destinationId` (raise `ValidationError`, no client call), fetch + normalise journeys, then call the ranking engine to populate `fastestId`, `economicalId`, and `comparison` into `RouteResult`
     - _Requirements: 2.1, 2.4, 2.5, 3.1, 4.1, 5.1, 5.3, 5.4, 5.6_
 
-  - [ ]* 8.4 Write property test for identical origin/destination rejection
+  - [x]* 8.4 Write property test for identical origin/destination rejection
     - **Property 6: Identical origin and destination are rejected**
     - **Validates: Requirements 2.5**
 
-  - [ ]* 8.5 Write unit tests for empty-result behaviors
+  - [x]* 8.5 Write unit tests for empty-result behaviors
     - Empty location list returns empty (drives "no locations found"); empty journey list returns empty result (drives "no routes found")
     - _Requirements: 1.4, 2.4_
 
-- [ ] 9. Implement REST API layer with validation, rate limiting, and CORS
-  - [ ] 9.1 Implement input validation and rate-limiting middleware
+- [x] 9. Implement REST API layer with validation, rate limiting, and CORS
+  - [x] 9.1 Implement input validation and rate-limiting middleware
     - Create `backend/src/api/middleware.ts`: validate/allowlist query params (query length bounds, location-id format, ISO time format), per-IP and global rate limiting, and CORS restricted to `ALLOWED_ORIGINS`
     - _Requirements: 2.5, Security "Unauthenticated public endpoints"_
 
-  - [ ] 9.2 Implement REST controllers and wire services
+  - [x] 9.2 Implement REST controllers and wire services
     - Create `backend/src/api/routes.ts` exposing `GET /api/locations` and `GET /api/routes` (no journey-id detail endpoint — the `/api/routes` response already carries full leg-by-leg detail for every journey)
     - Wire `LocationService` and `RouteService`; map typed errors to the JSON envelope and status codes; set `Cache-Control` headers
     - Do NOT add a `getJourney`/journey-lookup handler and do NOT use `NotFoundError` for journey lookup — there is no journey-detail-by-id retrieval
     - Create `backend/src/server.ts` that mounts middleware and controllers and reads config from env
     - _Requirements: 1.1, 2.2, 3.2, 4.2, 5.5, 3.4_
 
-  - [ ]* 9.3 Write integration tests for the wired backend
+  - [x]* 9.3 Write integration tests for the wired backend
     - Assert `TfnswClient` sends the `Authorization` header and parses recorded EFA stop-finder and trip responses into domain models; assert rate limiting rejects requests above threshold; smoke-check the 3s/5s budgets against recorded endpoints
     - _Requirements: 1.1, 2.2, Security, Design "Testing Strategy"_
 
-- [ ] 10. Checkpoint - Ensure all backend tests pass
+- [x] 10. Checkpoint - Ensure all backend tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [x] 11. Implement the mobile-first web frontend
@@ -237,7 +237,7 @@ All property tests use a mature PBT library (`fast-check`), run a minimum of 100
     - Reuse the formatting helpers from the shared package (`shared/src/format.ts`, task 2.1)
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.6_
 
-  - [ ]* 11.9 Write unit and responsive snapshot tests for comparison view
+  - [x]* 11.9 Write unit and responsive snapshot tests for comparison view
     - Comparison renders both entries side by side; snapshot tests confirm mobile-first breakpoints render correctly across phone and desktop widths
     - _Requirements: 5.1, Design "Frontend / Responsive Tests"_
 
@@ -247,16 +247,16 @@ All property tests use a mature PBT library (`fast-check`), run a minimum of 100
     - Make the retry action re-trigger the parent route search rather than re-fetch a single journey
     - _Requirements: 3.2, 4.2, 5.5, 3.4_
 
-- [ ] 12. Final integration and wiring
-  - [ ] 12.1 Wire the full frontend flow end to end
+- [x] 12. Final integration and wiring
+  - [x] 12.1 Wire the full frontend flow end to end
     - Connect search → route discovery → ranking/comparison → detail across the SPA using the backend API client, ensuring state (selections, typed text) is retained per the error-handling rules
     - _Requirements: 1.3, 2.1, 2.6, 3.4, 5.1, 5.5_
 
-  - [ ]* 12.2 Write a frontend integration test for the happy-path flow
+  - [x]* 12.2 Write a frontend integration test for the happy-path flow
     - Drive search → results → route list → comparison → detail against a mocked backend
     - _Requirements: 1.1, 2.2, 5.1, 5.5_
 
-- [ ] 13. Final checkpoint - Ensure all tests pass
+- [x] 13. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes

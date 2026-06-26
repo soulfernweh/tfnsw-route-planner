@@ -17,7 +17,7 @@
 // LocationSearchField (task 11.2) and passed in as props; this component never
 // owns or mutates them, so a failed search cannot lose them.
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiClient, apiClient as sharedApiClient } from '../api/client';
 import type { Journey, Location, RouteResult } from '../api/types';
 import { RouteList } from './RouteList';
@@ -34,6 +34,19 @@ export interface RouteSearchControllerProps {
   client?: ApiClient;
   /** Invoked when the user selects a route to view its details (task 11.6). */
   onSelectJourney?: (journey: Journey) => void;
+  /**
+   * Surfaces the latest route result to the parent so it can render the
+   * comparison and detail views from the already-fetched journeys. Receives the
+   * `RouteResult` on a successful search, or `null` while idle/loading or after
+   * a failure (so the parent can clear any stale comparison/detail).
+   */
+  onResult?: (result: RouteResult | null) => void;
+  /**
+   * Monotonically-increasing retry signal. Whenever this value changes, the
+   * controller re-runs the current search. The parent wires this to the
+   * JourneyDetailView retry action (Req 3.4).
+   */
+  retrySignal?: number;
 }
 
 type SearchState =
@@ -66,6 +79,8 @@ export function RouteSearchController({
   time,
   client,
   onSelectJourney,
+  onResult,
+  retrySignal,
 }: RouteSearchControllerProps): JSX.Element {
   const [state, setState] = useState<SearchState>({ status: 'idle' });
   const activeClient = client ?? sharedApiClient;
@@ -108,6 +123,28 @@ export function RouteSearchController({
       setState({ status: 'error', message: SERVICE_UNAVAILABLE_MESSAGE });
     }
   }, [origin, destination, time, activeClient]);
+
+  // Surface the latest result (or null) to the parent so it can render the
+  // comparison and detail views from the already-fetched journeys (Req 5.1,
+  // 5.5). On loading/error/idle we pass null so any stale views are cleared.
+  useEffect(() => {
+    if (!onResult) {
+      return;
+    }
+    onResult(state.status === 'success' ? state.result : null);
+  }, [state, onResult]);
+
+  // Re-run the current search whenever the parent bumps the retry signal. This
+  // backs the JourneyDetailView retry action (Req 3.4). The initial render is
+  // skipped so mounting never triggers an unsolicited search.
+  const lastRetryRef = useRef<number | undefined>(retrySignal);
+  useEffect(() => {
+    if (retrySignal === undefined || lastRetryRef.current === retrySignal) {
+      return;
+    }
+    lastRetryRef.current = retrySignal;
+    void runSearch();
+  }, [retrySignal, runSearch]);
 
   const showNoResults =
     state.status === 'success' && state.result.journeys.length === 0;
