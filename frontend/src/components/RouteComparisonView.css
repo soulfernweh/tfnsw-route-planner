@@ -1,0 +1,230 @@
+/* RouteComparisonView styles.
+ *
+ * Mobile-first: the two routes stack as full-width cards on phones and sit side
+ * by side from the tablet breakpoint up (>= 600px). Faster/cheaper status is
+ * conveyed with text tags (not colour alone) for accessibility, and selectable
+ * cards expose a real, focusable button with a visible focus ring.
+ */
+
+.comparison {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.comparison__heading {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.comparison__notice {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  color: #7a5206;
+  background: #f7e6c4;
+  border: 1px solid #e6cd92;
+}
+
+/* Routes layout ------------------------------------------------------------*/
+
+.comparison__routes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.comparison-card-item {
+  display: flex;
+  flex: 1;
+}
+
+.comparison-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  width: 100%;
+  text-align: left;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-top: 4px solid var(--color-primary);
+  border-radius: 10px;
+  padding: var(--space-md);
+}
+
+.comparison-card--interactive {
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.comparison-card--interactive:hover,
+.comparison-card--interactive:focus-visible {
+  border-color: var(--color-primary);
+  outline: none;
+}
+
+.comparison-card--interactive:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}
+
+.comparison-card__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.comparison-card__role {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.comparison-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.comparison-tag {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.comparison-tag--faster {
+  color: #0f5226;
+  background: #d8f0e0;
+}
+
+.comparison-tag--cheaper {
+  color: #7a5206;
+  background: #f7e6c4;
+}
+
+/* Per-route meta -----------------------------------------------------------*/
+
+.comparison-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  margin: 0;
+}
+
+.comparison-card__meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.comparison-card__meta-item dt {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+}
+
+.comparison-card__meta-item dd {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.comparison-card__fare--missing {
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.comparison-card__estimate-tag {
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--color-text-muted);
+}
+
+.comparison-card__modes {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.comparison-card__mode {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+}
+
+.comparison-card__mode--empty {
+  color: var(--color-text-muted);
+  border: none;
+  background: transparent;
+}
+
+.comparison-card__cta {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+/* Difference summary -------------------------------------------------------*/
+
+.comparison-diff {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  margin: 0;
+  padding: var(--space-md);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.comparison-diff__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.comparison-diff__item dt {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+}
+
+.comparison-diff__item dd {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.comparison-diff__note {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+@media (min-width: 600px) {
+  .comparison__routes {
+    flex-direction: row;
+    align-items: stretch;
+  }
+
+  .comparison__routes--single {
+    flex-direction: column;
+  }
+}

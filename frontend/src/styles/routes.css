@@ -1,0 +1,207 @@
+/* Route search + route list styles.
+ *
+ * Mobile-first: route cards render as full-width, comfortably tappable cards on
+ * phones, and gain a little more horizontal layout from the tablet breakpoint
+ * up. Fastest / economical routes are highlighted with a coloured edge and a
+ * badge so they are distinguishable without relying on colour alone.
+ */
+
+.route-search {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.route-search__actions {
+  display: flex;
+}
+
+.route-search__button {
+  flex: 1;
+  min-height: 44px; /* comfortable touch target */
+  padding: var(--space-sm) var(--space-md);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-primary-contrast);
+  background: var(--color-primary);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.route-search__button:disabled {
+  background: var(--color-border);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+.route-search__message {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: 8px;
+  font-size: 0.875rem;
+}
+
+.route-search__message--validation,
+.route-search__message--error {
+  color: #8a1c1c;
+  background: #fdecec;
+  border: 1px solid #f3c2c2;
+}
+
+.route-search__message--empty {
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+  border: 1px dashed var(--color-border);
+}
+
+/* Route list ---------------------------------------------------------------*/
+
+.route-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.route-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-border);
+  border-radius: 10px;
+  padding: var(--space-md);
+}
+
+.route-card--interactive {
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.route-card--interactive:hover,
+.route-card--interactive:focus-visible {
+  border-color: var(--color-primary);
+  outline: none;
+}
+
+/* Highlight the fastest / economical routes (Req 3.1, 4.1). */
+.route-card--fastest {
+  border-left-color: #1f7a3d; /* green edge for fastest */
+}
+
+.route-card--economical {
+  border-left-color: #b5780a; /* amber edge for economical */
+}
+
+.route-card--fastest.route-card--economical {
+  /* When a single route is both, prefer the fastest edge but keep both badges. */
+  border-left-color: #1f7a3d;
+}
+
+.route-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-sm);
+}
+
+.route-badge {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.route-badge--fastest {
+  color: #0f5226;
+  background: #d8f0e0;
+}
+
+.route-badge--economical {
+  color: #7a5206;
+  background: #f7e6c4;
+}
+
+.route-card__times {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.route-card__time {
+  display: flex;
+  flex-direction: column;
+}
+
+.route-card__time-label {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+}
+
+.route-card__arrow {
+  color: var(--color-text-muted);
+}
+
+.route-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  margin: var(--space-sm) 0 0;
+}
+
+.route-card__meta-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.route-card__meta-item dt {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+}
+
+.route-card__meta-item dd {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.route-card__modes {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.route-card__mode {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+}
+
+.route-card__mode--empty {
+  color: var(--color-text-muted);
+  border: none;
+  background: transparent;
+}
+
+@media (min-width: 600px) {
+  .route-card__times {
+    font-size: 1.25rem;
+  }
+}

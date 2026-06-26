@@ -1,0 +1,29 @@
+{
+  "_note": "ESTIMATES ONLY. These adult Opal distance bands and fare values are a reasonable starting point and MUST be reconciled against the official Transport for NSW Opal Fares dataset (the 'Opal Distance Tables' and 'Opal Fare Values' XLSX published on the TfNSW Open Data Hub) before being relied upon. Fares are integer cents (AUD). Transfer discounts and daily/weekly caps are intentionally out of scope. Bands are ordered ascending by distance; a leg's distance falls into the FIRST band whose maxDistanceMetres is null (top, open-ended band) or is >= the leg distance (upper edge inclusive).",
+  "currency": "AUD",
+  "modeToTable": {
+    "train": "rail",
+    "metro": "rail",
+    "lightRail": "rail",
+    "bus": "bus",
+    "ferry": "ferry"
+  },
+  "tables": {
+    "rail": [
+      { "maxDistanceMetres": 10000, "fareCents": 420 },
+      { "maxDistanceMetres": 20000, "fareCents": 522 },
+      { "maxDistanceMetres": 35000, "fareCents": 601 },
+      { "maxDistanceMetres": 65000, "fareCents": 803 },
+      { "maxDistanceMetres": null, "fareCents": 1032 }
+    ],
+    "bus": [
+      { "maxDistanceMetres": 3000, "fareCents": 320 },
+      { "maxDistanceMetres": 8000, "fareCents": 379 },
+      { "maxDistanceMetres": null, "fareCents": 487 }
+    ],
+    "ferry": [
+      { "maxDistanceMetres": 9000, "fareCents": 643 },
+      { "maxDistanceMetres": null, "fareCents": 804 }
+    ]
+  }
+}

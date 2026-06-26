@@ -1,0 +1,65 @@
+/* Global, mobile-first base styles and design tokens.
+ *
+ * Breakpoints follow a mobile-first strategy: base rules target phones, and
+ * `min-width` media queries progressively enhance for tablet and desktop.
+ *   - phone:   < 600px   (base, no media query)
+ *   - tablet:  >= 600px
+ *   - desktop: >= 1024px
+ */
+
+:root {
+  /* Breakpoint reference values (documented; CSS media queries use literals). */
+  --bp-tablet: 600px;
+  --bp-desktop: 1024px;
+
+  /* Spacing scale. */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+
+  /* Layout. */
+  --content-max-width: 1100px;
+
+  /* Palette. */
+  --color-bg: #f5f6f8;
+  --color-surface: #ffffff;
+  --color-border: #e2e5ea;
+  --color-text: #1c2330;
+  --color-text-muted: #5b6472;
+  --color-primary: #0a4f8f; /* TfNSW-style transport blue */
+  --color-primary-contrast: #ffffff;
+
+  /* Typography. */
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  background: var(--color-bg);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0 0 var(--space-sm);
+  line-height: 1.25;
+}

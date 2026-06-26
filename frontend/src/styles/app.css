@@ -1,0 +1,107 @@
+/* App shell layout.
+ *
+ * Mobile-first: the search and results regions stack vertically on phones and
+ * sit side by side from the desktop breakpoint up, so the same components scale
+ * from phone to desktop (easing the later Android port).
+ */
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.app-header {
+  background: var(--color-primary);
+  color: var(--color-primary-contrast);
+  padding: var(--space-md);
+}
+
+.app-header__inner {
+  width: 100%;
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+}
+
+.app-header__title {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.app-header__subtitle {
+  margin: var(--space-xs) 0 0;
+  font-size: 0.8125rem;
+  opacity: 0.85;
+}
+
+.app-main {
+  flex: 1;
+  width: 100%;
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: var(--space-md);
+}
+
+/* Region container: stacked on phones. */
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.app-region {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: var(--space-md);
+}
+
+.app-region__heading {
+  font-size: 1rem;
+}
+
+.app-placeholder {
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+  padding: var(--space-md);
+  text-align: center;
+}
+
+.app-footer {
+  padding: var(--space-md);
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+/* Tablet: a touch more breathing room. */
+@media (min-width: 600px) {
+  .app-header__title {
+    font-size: 1.375rem;
+  }
+
+  .app-main {
+    padding: var(--space-lg);
+  }
+}
+
+/* Desktop: search and results side by side. */
+@media (min-width: 1024px) {
+  .app-layout {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .app-region--search {
+    flex: 0 0 360px;
+    position: sticky;
+    top: var(--space-lg);
+  }
+
+  .app-region--results {
+    flex: 1;
+    min-width: 0;
+  }
+}
