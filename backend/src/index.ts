@@ -18,7 +18,6 @@ export type {
   LocationService,
   RouteService,
   RouteRankingEngine,
-  TfnswClient,
 } from './domain/models.js';
 
 // Typed error classes and the safe client-facing error envelope helpers.
@@ -49,3 +48,28 @@ export {
   selectEconomical,
   buildComparison,
 } from './domain/rankingEngine.js';
+
+// Secure, resilient TfNSW Trip Planner client (the only network-facing
+// component; reads the API key from the backend environment only).
+export { TfnswClient, sydneyDateTimeParts } from './tfnsw/client.js';
+export type {
+  FetchFn,
+  DepArrMode,
+  TfnswClientOptions,
+} from './tfnsw/client.js';
+
+// In-memory TTL + LRU cache primitive and its key-building / TTL helpers
+// (caching strategy infrastructure; not yet wired into the TfNSW client).
+export {
+  TtlLruCache,
+  STOP_FINDER_TTL_MS,
+  TRIP_TTL_MS,
+  TRIP_TIME_BUCKET_MS,
+  buildCacheKey,
+  normaliseQuery,
+  stopFinderCacheKey,
+  tripTimeBucket,
+  tripCacheKey,
+} from './infra/cache.js';
+
+export type { TtlLruCacheOptions } from './infra/cache.js';

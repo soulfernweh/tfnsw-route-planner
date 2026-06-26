@@ -65,11 +65,11 @@ All property tests use a mature PBT library (`fast-check`), run a minimum of 100
     - Create `backend/src/domain/rankingEngine.ts` implementing `selectFastest` (min travel time, tiebreak fewest transfers) and `selectEconomical` (min fare among priced journeys, tiebreak shortest travel time, excludes null-fare journeys)
     - _Requirements: 3.1, 4.1, 4.4_
 
-  - [ ]* 3.5 Write property test for fastest selection
+  - [x]* 3.5 Write property test for fastest selection
     - **Property 7: Fastest selection minimises travel time then transfers**
     - **Validates: Requirements 3.1**
 
-  - [ ]* 3.6 Write property test for economical selection
+  - [x]* 3.6 Write property test for economical selection
     - **Property 9: Economical selection minimises fare among priced routes and excludes unpriced routes**
     - **Validates: Requirements 4.1, 4.4**
 
@@ -77,19 +77,19 @@ All property tests use a mature PBT library (`fast-check`), run a minimum of 100
     - Add `buildComparison(fastest, economical)` to `rankingEngine.ts` computing `travelTimeDifferenceMinutes`, `fareDifferenceCents` (null when either fare missing), `fasterRouteId`/`cheaperRouteId`, `sameRoute`, and `fareUnavailableForFastest`
     - _Requirements: 5.3, 5.4, 5.6_
 
-  - [ ]* 3.8 Write property test for comparison differences and labels
+  - [x]* 3.8 Write property test for comparison differences and labels
     - **Property 10: Comparison differences and faster/cheaper labels are consistent**
     - **Validates: Requirements 5.3**
 
-  - [ ]* 3.9 Write property test for coinciding fastest/economical route
+  - [x]* 3.9 Write property test for coinciding fastest/economical route
     - **Property 12: Coinciding fastest and economical collapse to a single route**
     - **Validates: Requirements 5.4**
 
-  - [ ]* 3.10 Write property test for missing fare on the fastest route
+  - [x]* 3.10 Write property test for missing fare on the fastest route
     - **Property 13: Missing fare on the fastest route is handled in comparison**
     - **Validates: Requirements 5.6**
 
-- [ ] 4. Checkpoint - Ensure all tests pass
+- [x] 4. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [x] 5. Implement the EFA normaliser
@@ -98,11 +98,11 @@ All property tests use a mature PBT library (`fast-check`), run a minimum of 100
     - Treat EFA input as untrusted: validate and coerce rather than trust structure
     - _Requirements: 1.1, 1.2_
 
-  - [ ]* 5.2 Write property test for location result cap
+  - [x]* 5.2 Write property test for location result cap
     - **Property 1: Location results are capped at 10**
     - **Validates: Requirements 1.1**
 
-  - [ ]* 5.3 Write property test for normalised location completeness
+  - [x]* 5.3 Write property test for normalised location completeness
     - **Property 2: Normalised locations are complete**
     - **Validates: Requirements 1.2**
 
@@ -118,11 +118,11 @@ All property tests use a mature PBT library (`fast-check`), run a minimum of 100
     - Depends on tasks 1.4 (extended models) and 5.7 (Opal Fare Calculator)
     - _Requirements: 2.2, 2.3, 4.2, 4.3, 4.5_
 
-  - [ ]* 5.5 Write property test for journey cap and ordering
+  - [x]* 5.5 Write property test for journey cap and ordering
     - **Property 4: Journeys are capped at 5 and ordered by departure**
     - **Validates: Requirements 2.2**
 
-  - [ ]* 5.6 Write property test for EFA normalisation round-trip
+  - [x]* 5.6 Write property test for EFA normalisation round-trip
     - **Property 14: EFA normalisation round-trip**
     - **Validates: Requirements 1.2, 2.3, 4.3**
 
@@ -138,8 +138,8 @@ All property tests use a mature PBT library (`fast-check`), run a minimum of 100
     - Assert walk and bicycle modes return `null`
     - _Requirements: 4.3, 4.5_
 
-- [ ] 6. Implement the secure TfNSW API client
-  - [ ] 6.1 Implement `TfnswClient` with secure key injection and resilience
+- [x] 6. Implement the secure TfNSW API client
+  - [x] 6.1 Implement `TfnswClient` with secure key injection and resilience
     - Create `backend/src/tfnsw/client.ts` implementing `stopFinder(query)` and `trip(originId, destinationId, time, mode)`
     - Use base URL `https://api.transport.nsw.gov.au/v1/tp/` (read `TFNSW_BASE_URL` from env) and header `Authorization: apikey <key>` (read `TFNSW_API_KEY` from env only); never log or return the key or raw payloads
     - Send common params `outputFormat=rapidJSON` and `coordOutputFormat=EPSG:4326` on every request
@@ -149,22 +149,22 @@ All property tests use a mature PBT library (`fast-check`), run a minimum of 100
     - Delegate response parsing to the normaliser from task 5
     - _Requirements: 1.1, 1.5, 2.2, 2.6, Security "API key protection"_
 
-  - [ ]* 6.2 Write unit tests for client error/timeout mapping
+  - [x]* 6.2 Write unit tests for client error/timeout mapping
     - Mock the HTTP layer to assert transient errors trigger one retry then `ServiceUnavailableError`, and that the key never appears in errors/logs
     - _Requirements: 1.5, 2.6_
 
-- [ ] 7. Implement caching layer
-  - [ ] 7.1 Implement an in-memory LRU cache with TTL
+- [x] 7. Implement caching layer
+  - [x] 7.1 Implement an in-memory LRU cache with TTL
     - Create `backend/src/infra/cache.ts` with get/set and per-entry TTL
     - Wrap `TfnswClient` calls: stop-finder keyed by normalised (lowercased, trimmed) query with ~24h TTL; trip keyed by `(originId, destinationId, time-bucket)` with ~60s TTL
     - _Requirements: Design "Caching Strategy"_
 
-  - [ ]* 7.2 Write unit tests for cache hit/miss and TTL expiry
+  - [x]* 7.2 Write unit tests for cache hit/miss and TTL expiry
     - Test key normalisation, hit on repeat call, and expiry after TTL
     - _Requirements: Design "Caching Strategy"_
 
 - [ ] 8. Implement the Location and Route services
-  - [ ] 8.1 Implement `LocationService.searchLocations`
+  - [-] 8.1 Implement `LocationService.searchLocations`
     - Create `backend/src/services/locationService.ts`: guard trimmed query length < 3 (return empty, do not call client), otherwise call cached `TfnswClient.stopFinder` and return up to 10 `Location[]`
     - _Requirements: 1.1, 1.4, 1.6_
 
@@ -172,7 +172,7 @@ All property tests use a mature PBT library (`fast-check`), run a minimum of 100
     - **Property 3: Short queries never reach the API**
     - **Validates: Requirements 1.6**
 
-  - [ ] 8.3 Implement `RouteService.planRoutes`
+  - [-] 8.3 Implement `RouteService.planRoutes`
     - Create `backend/src/services/routeService.ts`: validate `originId !== destinationId` (raise `ValidationError`, no client call), fetch + normalise journeys, then call the ranking engine to populate `fastestId`, `economicalId`, and `comparison` into `RouteResult`
     - _Requirements: 2.1, 2.4, 2.5, 3.1, 4.1, 5.1, 5.3, 5.4, 5.6_
 
@@ -228,7 +228,7 @@ All property tests use a mature PBT library (`fast-check`), run a minimum of 100
     - Render full leg-by-leg details (per-leg departure/arrival, mode, platform where available, per-leg + total fare for the economical selection); provide a retry action when detail retrieval fails
     - _Requirements: 3.2, 4.2, 5.5, 3.4_
 
-  - [ ]* 11.7 Write unit tests for detail rendering and retry
+  - [x]* 11.7 Write unit tests for detail rendering and retry
     - Detail view renders leg info including platform when present; detail fetch failure shows error and exposes retry
     - _Requirements: 3.2, 4.2, 5.5, 3.4_
 
