@@ -31,6 +31,7 @@ import { resolve as resolvePath } from 'node:path';
 import type { Journey, Location } from './domain/models.js';
 import { TfnswClient } from './tfnsw/client.js';
 import { TtlLruCache } from './infra/cache.js';
+import { loadEnvFile } from './infra/loadEnv.js';
 import { DefaultLocationService } from './services/locationService.js';
 import { RouteService } from './services/routeService.js';
 import { createRateLimiter, parseAllowedOrigins } from './api/middleware.js';
@@ -129,15 +130,21 @@ export function buildServer(config: ServerConfig = loadConfig()): Server {
 
 /**
  * Build and start the HTTP server, listening on the configured port.
+ *
+ * Loads the repo-root `.env` (with override) FIRST so the TfNSW key/base URL
+ * and server config are available regardless of any stale shell variable, then
+ * builds the dependency graph and starts listening.
  */
-export function startServer(config: ServerConfig = loadConfig()): Server {
-  const server = buildServer(config);
-  server.listen(config.port, () => {
+export function startServer(config?: ServerConfig): Server {
+  loadEnvFile();
+  const resolvedConfig = config ?? loadConfig();
+  const server = buildServer(resolvedConfig);
+  server.listen(resolvedConfig.port, () => {
     // Log only non-sensitive runtime info — never the API key.
     // eslint-disable-next-line no-console
     console.log(
-      `TfNSW Route Planner backend listening on port ${String(config.port)} ` +
-        `(allowed origins: ${config.allowedOrigins.length > 0 ? config.allowedOrigins.join(', ') : 'none'})`,
+      `TfNSW Route Planner backend listening on http://localhost:${String(resolvedConfig.port)} ` +
+        `(allowed origins: ${resolvedConfig.allowedOrigins.length > 0 ? resolvedConfig.allowedOrigins.join(', ') : 'none'})`,
     );
   });
   return server;

@@ -47,23 +47,24 @@ ALLOWED_ORIGINS=http://localhost:5173
 
 ## Running locally
 
-Start the backend API (defaults to port `8787`):
+Start **both** the backend (port `8787`) and the frontend (port `5173`) with one command:
 
 ```bash
-node --env-file=.env --import tsx backend/src/server.ts
-# or, from backend/, with the env already loaded into your shell:
-npm run dev --workspace @tfnsw/backend
+npm run dev
 ```
 
-> `node --env-file` will **not** override a variable already set in your shell. If the key looks wrong, open a fresh terminal so no stale `TFNSW_API_KEY` shadows the file.
+That's it — the backend loads your `.env` automatically (overriding any stale shell variable), and the frontend proxies `/api` calls to the backend, so there's no CORS or base-URL setup. Open the URL Vite prints (usually <http://localhost:5173>; if that port is busy it falls back to `5174`, etc.).
 
-Start the frontend (Vite dev server on port `5173`):
+To run them separately (e.g. in two terminals):
 
 ```bash
-npm run dev --workspace @tfnsw/frontend
+npm run dev:backend    # http://localhost:8787
+npm run dev:frontend   # http://localhost:5173
 ```
 
-The frontend calls the backend at the same origin by default; set `VITE_API_BASE_URL` if the backend runs elsewhere.
+Notes:
+- If you change the backend port, point the frontend proxy at it with `VITE_BACKEND_URL` (e.g. `VITE_BACKEND_URL=http://localhost:9000 npm run dev:frontend`).
+- The backend reads its config from `.env` at startup. No `--env-file` flag is needed.
 
 ## Live smoke test
 
