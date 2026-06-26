@@ -475,14 +475,75 @@ function toLegStop(stop: Record<string, unknown>, timeIso: string): LegStop {
 }
 
 /**
+ * Compute the great-circle distance in metres between two `[lat, lng]` points
+ * using the haversine formula.
+ */
+function haversineMetres(
+  a: readonly [number, number],
+  b: readonly [number, number],
+): number {
+  const EARTH_RADIUS_M = 6_371_000;
+  const toRad = (deg: number): number => (deg * Math.PI) / 180;
+  const dLat = toRad(b[0] - a[0]);
+  const dLng = toRad(b[1] - a[1]);
+  const lat1 = toRad(a[0]);
+  const lat2 = toRad(b[0]);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/**
+ * Derive a leg's travelled distance in metres from its `coords` polyline.
+ *
+ * The live TfNSW trip response does NOT carry a `leg.distance` field; instead
+ * each leg includes a `coords` array of `[lat, lng]` points tracing the path.
+ * We sum the haversine distance between consecutive valid points to recover an
+ * approximate travelled distance, which the Opal fare calculator then maps to a
+ * fare band. Returns `null` when fewer than two valid points are present.
+ *
+ * @param coords - the raw `leg.coords` value (untrusted)
+ * @returns the approximate path length in metres, or `null`
+ */
+function polylineLengthMetres(coords: unknown): number | null {
+  if (!Array.isArray(coords)) {
+    return null;
+  }
+
+  const points: Array<[number, number]> = [];
+  for (const point of coords) {
+    if (Array.isArray(point) && point.length >= 2) {
+      const lat = toFiniteNumber(point[0]);
+      const lng = toFiniteNumber(point[1]);
+      if (lat !== null && lng !== null) {
+        points.push([lat, lng]);
+      }
+    }
+  }
+
+  if (points.length < 2) {
+    return null;
+  }
+
+  let total = 0;
+  for (let i = 1; i < points.length; i += 1) {
+    total += haversineMetres(points[i - 1]!, points[i]!);
+  }
+  return Math.round(total);
+}
+
+/**
  * Normalise a single raw EFA leg into a domain `Leg`, or `null` if it cannot be
  * normalised (e.g. missing stops or unusable times).
  *
  * Times are read from the STOPS (origin departure / destination arrival),
  * preferring estimated over planned. `durationMinutes` comes from `leg.duration`
  * (seconds), falling back to the time span when absent. `distanceMetres` comes
- * from `leg.distance` (metres). The per-leg `fare` is computed via the Opal
- * Fare Calculator (walk/bicycle connectors are never priced).
+ * from `leg.distance` (metres) when present, otherwise it is derived from the
+ * `leg.coords` polyline (the live API omits `distance`). The per-leg `fare` is
+ * computed via the Opal Fare Calculator (walk/bicycle connectors are never
+ * priced).
  */
 function normaliseLeg(rawLeg: unknown): Leg | null {
   if (!isObject(rawLeg)) {
@@ -504,9 +565,14 @@ function normaliseLeg(rawLeg: unknown): Leg | null {
   const mode = toTransportMode(rawLeg['transportation']);
   const isTransfer = mode === 'walk' || mode === 'bicycle';
 
-  // Distance in metres (used for fare estimation); reject negative values.
+  // Distance in metres (used for fare estimation). The live TfNSW API omits a
+  // `leg.distance` field, so fall back to the length of the `coords` polyline
+  // when the explicit distance is absent or invalid.
   const rawDistance = toFiniteNumber(rawLeg['distance']);
-  const distanceMetres = rawDistance !== null && rawDistance >= 0 ? rawDistance : null;
+  const distanceMetres =
+    rawDistance !== null && rawDistance >= 0
+      ? rawDistance
+      : polylineLengthMetres(rawLeg['coords']);
 
   // Duration in seconds → minutes; fall back to the stop-time span if absent.
   const durationSeconds = toFiniteNumber(rawLeg['duration']);
