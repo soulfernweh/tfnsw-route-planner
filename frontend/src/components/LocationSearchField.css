@@ -1,9 +1,8 @@
-/* LocationSearchField styles.
+/* LocationSearchField styles — Modern elevated input with focus ring animation.
  *
- * Mobile-first: the field fills the available width and the result list is a
- * full-width, comfortably tappable dropdown. From the tablet breakpoint up the
- * options gain a little more padding. The list is positioned relative to the
- * field wrapper so it overlays following content rather than pushing it down.
+ * Mobile-first: the field fills available width and the result list is a
+ * full-width, comfortably tappable dropdown with shadow and hover highlights.
+ * Mode tags render as small coloured pills in each result row.
  */
 
 .location-search {
@@ -21,19 +20,22 @@
 
 .location-search__input {
   width: 100%;
-  padding: 0.625rem var(--space-sm);
-  font-size: 1rem; /* >= 16px avoids iOS zoom-on-focus */
+  padding: 0.75rem var(--space-md);
+  font-size: 1rem;
   color: var(--color-text);
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-input);
   line-height: 1.4;
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--transition-fast),
+    box-shadow var(--transition-base);
 }
 
 .location-search__input:focus {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 1px;
+  outline: none;
   border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(27, 79, 114, 0.15), var(--shadow-sm);
 }
 
 .location-search__status {
@@ -50,9 +52,10 @@
 }
 
 .location-search__message--error {
-  color: #b3261e;
+  color: var(--color-error);
 }
 
+/* Results dropdown — subtle shadow and rounded corners. */
 .location-search__results {
   position: absolute;
   top: 100%;
@@ -60,23 +63,24 @@
   right: 0;
   z-index: 20;
   margin: var(--space-xs) 0 0;
-  padding: 0;
+  padding: var(--space-xs) 0;
   list-style: none;
-  max-height: 16rem;
+  max-height: 18rem;
   overflow-y: auto;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(12, 22, 38, 0.12);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-lg);
 }
 
 .location-search__option {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 0.625rem var(--space-sm);
+  padding: 0.75rem var(--space-md);
   cursor: pointer;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  transition: background-color var(--transition-fast);
 }
 
 .location-search__option:last-child {
@@ -85,7 +89,7 @@
 
 .location-search__option--active,
 .location-search__option:hover {
-  background: rgba(10, 79, 143, 0.08);
+  background: rgba(27, 79, 114, 0.06);
 }
 
 .location-search__option-name {
@@ -104,33 +108,75 @@
 
 .location-search__option-type {
   display: inline-block;
-  padding: 0 0.375rem;
-  border-radius: 4px;
-  background: rgba(10, 79, 143, 0.1);
+  padding: 1px 0.5rem;
+  border-radius: var(--radius-pill);
+  background: rgba(27, 79, 114, 0.08);
   color: var(--color-primary);
   font-weight: 600;
+  font-size: 0.6875rem;
 }
 
 .location-search__option-modes {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin-top: 2px;
+  margin-top: 4px;
 }
 
+/* Mode pills — coloured per transit mode. */
 .location-search__mode-tag {
   display: inline-block;
-  padding: 0 0.375rem;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  line-height: 1.4;
-  border-radius: 4px;
-  background: rgba(12, 22, 38, 0.06);
-  color: var(--color-text-muted);
+  padding: 1px 0.5rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 1.5;
+  border-radius: var(--radius-pill);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.location-search__mode-tag--train {
+  background: rgba(0, 81, 165, 0.12);
+  color: var(--color-train);
+}
+
+.location-search__mode-tag--metro {
+  background: rgba(0, 140, 149, 0.12);
+  color: var(--color-metro);
+}
+
+.location-search__mode-tag--bus {
+  background: rgba(0, 180, 216, 0.12);
+  color: #007a94;
+}
+
+.location-search__mode-tag--ferry {
+  background: rgba(45, 106, 79, 0.12);
+  color: var(--color-ferry);
+}
+
+.location-search__mode-tag--lightRail {
+  background: rgba(230, 57, 70, 0.12);
+  color: var(--color-lightRail);
+}
+
+.location-search__mode-tag--coach {
+  background: rgba(123, 45, 139, 0.12);
+  color: var(--color-coach);
+}
+
+.location-search__mode-tag--school {
+  background: rgba(244, 163, 0, 0.12);
+  color: #8a5d00;
+}
+
+.location-search__mode-tag--walk {
+  background: rgba(108, 117, 125, 0.1);
+  color: var(--color-walk);
 }
 
 @media (min-width: 600px) {
   .location-search__option {
-    padding: 0.75rem var(--space-md);
+    padding: 0.75rem var(--space-lg);
   }
 }

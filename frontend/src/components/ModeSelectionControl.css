@@ -1,7 +1,8 @@
-/* ModeSelectionControl styles.
+/* ModeSelectionControl styles — Coloured mode chips that toggle on/off.
  *
- * Mobile-first: checkboxes flow into a wrapping grid of comfortably tappable
- * pills. Uses the shared design tokens.
+ * Mobile-first: chips flow into a wrapping grid of tappable pills. Selected
+ * chips are filled with the mode colour; deselected chips are outlined. Smooth
+ * transitions between states.
  */
 
 .mode-selection__fieldset {
@@ -15,39 +16,119 @@
   font-size: 0.8125rem;
   font-weight: 600;
   color: var(--color-text);
+  margin-bottom: var(--space-xs);
 }
 
 .mode-selection__options {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-xs);
-  margin-top: var(--space-xs);
 }
 
 .mode-selection__option {
   display: inline-flex;
   align-items: center;
   gap: var(--space-xs);
-  padding: 0.5rem var(--space-sm);
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
+  padding: 0.4375rem 0.75rem;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-pill);
   background: var(--color-surface);
   cursor: pointer;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  transition: background-color var(--transition-fast),
+    border-color var(--transition-fast), color var(--transition-fast),
+    box-shadow var(--transition-fast), transform var(--transition-fast);
+}
+
+.mode-selection__option:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Filled state when checked — uses mode colours via has(). */
+.mode-selection__option:has(input:checked) {
+  box-shadow: var(--shadow-sm);
 }
 
 .mode-selection__option:focus-within {
   outline: 2px solid var(--color-primary);
-  outline-offset: 1px;
-  border-color: var(--color-primary);
+  outline-offset: 2px;
 }
 
+/* Hide native checkbox visually. */
 .mode-selection__checkbox {
-  margin: 0;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Per-mode colour application when checked.
+ * We use nth-child matching to the canonical mode order:
+ * 1:train, 2:metro, 3:lightRail, 4:bus, 5:coach, 6:ferry, 7:school */
+.mode-selection__option:nth-child(1):has(input:checked) {
+  background: var(--color-train);
+  border-color: var(--color-train);
+  color: #fff;
+}
+
+.mode-selection__option:nth-child(2):has(input:checked) {
+  background: var(--color-metro);
+  border-color: var(--color-metro);
+  color: #fff;
+}
+
+.mode-selection__option:nth-child(3):has(input:checked) {
+  background: var(--color-lightRail);
+  border-color: var(--color-lightRail);
+  color: #fff;
+}
+
+.mode-selection__option:nth-child(4):has(input:checked) {
+  background: var(--color-bus);
+  border-color: var(--color-bus);
+  color: #003d4d;
+}
+
+.mode-selection__option:nth-child(5):has(input:checked) {
+  background: var(--color-coach);
+  border-color: var(--color-coach);
+  color: #fff;
+}
+
+.mode-selection__option:nth-child(6):has(input:checked) {
+  background: var(--color-ferry);
+  border-color: var(--color-ferry);
+  color: #fff;
+}
+
+.mode-selection__option:nth-child(7):has(input:checked) {
+  background: var(--color-school);
+  border-color: var(--color-school);
+  color: #3d2700;
+}
+
+/* Deselected state — subtle outline in mode colour. */
+.mode-selection__option:nth-child(1):not(:has(input:checked)) { border-color: rgba(0, 81, 165, 0.4); color: var(--color-train); }
+.mode-selection__option:nth-child(2):not(:has(input:checked)) { border-color: rgba(0, 140, 149, 0.4); color: var(--color-metro); }
+.mode-selection__option:nth-child(3):not(:has(input:checked)) { border-color: rgba(230, 57, 70, 0.4); color: var(--color-lightRail); }
+.mode-selection__option:nth-child(4):not(:has(input:checked)) { border-color: rgba(0, 180, 216, 0.4); color: #007a94; }
+.mode-selection__option:nth-child(5):not(:has(input:checked)) { border-color: rgba(123, 45, 139, 0.4); color: var(--color-coach); }
+.mode-selection__option:nth-child(6):not(:has(input:checked)) { border-color: rgba(45, 106, 79, 0.4); color: var(--color-ferry); }
+.mode-selection__option:nth-child(7):not(:has(input:checked)) { border-color: rgba(244, 163, 0, 0.4); color: #8a5d00; }
+
+.mode-selection__option-label {
+  pointer-events: none;
 }
 
 .mode-selection__hint {
   margin: var(--space-xs) 0 0;
   font-size: 0.8125rem;
-  color: #b3261e;
+  color: var(--color-error);
 }

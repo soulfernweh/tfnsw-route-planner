@@ -1,9 +1,8 @@
-/* RouteComparisonView styles.
+/* RouteComparisonView styles — Side-by-side cards with colour accents.
  *
- * Mobile-first: the two routes stack as full-width cards on phones and sit side
- * by side from the tablet breakpoint up (>= 600px). Faster/cheaper status is
- * conveyed with text tags (not colour alone) for accessibility, and selectable
- * cards expose a real, focusable button with a visible focus ring.
+ * Mobile-first: routes stack as full-width cards on phones and sit side by
+ * side from tablet (600px+). Fastest gets green border-top, economical gets
+ * blue. A "VS" divider appears on desktop, stacked on mobile.
  */
 
 .comparison {
@@ -15,12 +14,13 @@
 .comparison__heading {
   margin: 0;
   font-size: 1.125rem;
+  font-weight: 700;
 }
 
 .comparison__notice {
   margin: 0;
   padding: var(--space-sm) var(--space-md);
-  border-radius: 8px;
+  border-radius: var(--radius-input);
   font-size: 0.8125rem;
   color: #7a5206;
   background: #f7e6c4;
@@ -36,6 +36,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
+  position: relative;
 }
 
 .comparison-card-item {
@@ -52,8 +53,10 @@
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-top: 4px solid var(--color-primary);
-  border-radius: 10px;
-  padding: var(--space-md);
+  border-radius: var(--radius-card);
+  padding: var(--space-lg);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--transition-base), transform var(--transition-base);
 }
 
 .comparison-card--interactive {
@@ -62,15 +65,15 @@
   color: inherit;
 }
 
-.comparison-card--interactive:hover,
-.comparison-card--interactive:focus-visible {
-  border-color: var(--color-primary);
-  outline: none;
+.comparison-card--interactive:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
 }
 
 .comparison-card--interactive:focus-visible {
   outline: 2px solid var(--color-text);
   outline-offset: 2px;
+  box-shadow: var(--shadow-md);
 }
 
 .comparison-card__header {
@@ -94,22 +97,21 @@
 }
 
 .comparison-tag {
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  padding: 2px 8px;
-  border-radius: 999px;
+  letter-spacing: 0.04em;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  color: #fff;
 }
 
 .comparison-tag--faster {
-  color: #0f5226;
-  background: #d8f0e0;
+  background: var(--color-success);
 }
 
 .comparison-tag--cheaper {
-  color: #7a5206;
-  background: #f7e6c4;
+  background: var(--color-economy);
 }
 
 /* Per-route meta -----------------------------------------------------------*/
@@ -128,10 +130,11 @@
 }
 
 .comparison-card__meta-item dt {
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
   color: var(--color-text-muted);
+  font-weight: 500;
 }
 
 .comparison-card__meta-item dd {
@@ -146,7 +149,7 @@
 }
 
 .comparison-card__estimate-tag {
-  font-size: 0.625rem;
+  font-size: 0.5625rem;
   font-weight: 600;
   text-transform: none;
   letter-spacing: 0;
@@ -160,13 +163,21 @@
 }
 
 .comparison-card__mode {
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.6875rem;
+  font-weight: 700;
   padding: 2px 8px;
-  border-radius: 6px;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  color: #fff;
 }
+
+.comparison-card__mode--train { background: var(--color-train); }
+.comparison-card__mode--metro { background: var(--color-metro); }
+.comparison-card__mode--bus { background: var(--color-bus); color: #003d4d; }
+.comparison-card__mode--ferry { background: var(--color-ferry); }
+.comparison-card__mode--lightRail { background: var(--color-lightRail); }
+.comparison-card__mode--coach { background: var(--color-coach); }
+.comparison-card__mode--school { background: var(--color-school); color: #3d2700; }
+.comparison-card__mode--walk { background: var(--color-walk); }
 
 .comparison-card__mode--empty {
   color: var(--color-text-muted);
@@ -178,6 +189,7 @@
   font-size: 0.8125rem;
   font-weight: 600;
   color: var(--color-primary);
+  margin-top: var(--space-xs);
 }
 
 /* Difference summary -------------------------------------------------------*/
@@ -187,10 +199,10 @@
   flex-wrap: wrap;
   gap: var(--space-md);
   margin: 0;
-  padding: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: var(--radius-card);
 }
 
 .comparison-diff__item {
@@ -200,10 +212,11 @@
 }
 
 .comparison-diff__item dt {
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
   color: var(--color-text-muted);
+  font-weight: 500;
 }
 
 .comparison-diff__item dd {
@@ -218,6 +231,7 @@
   color: var(--color-text-muted);
 }
 
+/* Tablet+: side-by-side with VS divider. */
 @media (min-width: 600px) {
   .comparison__routes {
     flex-direction: row;
@@ -226,5 +240,32 @@
 
   .comparison__routes--single {
     flex-direction: column;
+  }
+
+  /* VS divider between cards (desktop only for two-card layout). */
+  .comparison__routes:not(.comparison__routes--single)::after {
+    content: 'VS';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.6875rem;
+    font-weight: 800;
+    color: var(--color-text-muted);
+    background: var(--color-bg);
+    padding: 4px 8px;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--color-border);
+    z-index: 1;
+    letter-spacing: 0.04em;
+  }
+
+  /* Colour accent borders: green for fastest (first), blue for economical (second). */
+  .comparison__routes:not(.comparison__routes--single) .comparison-card-item:first-child .comparison-card {
+    border-top-color: var(--color-success);
+  }
+
+  .comparison__routes:not(.comparison__routes--single) .comparison-card-item:last-child .comparison-card {
+    border-top-color: var(--color-economy);
   }
 }

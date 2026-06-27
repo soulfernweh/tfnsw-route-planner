@@ -1,7 +1,7 @@
-/* TimeFilterControl styles.
+/* TimeFilterControl styles — Pill-style radio buttons.
  *
- * Mobile-first: options wrap onto multiple rows on narrow screens and the
- * datetime input fills the available width. Uses the shared design tokens.
+ * Mobile-first: options render as tappable pills with filled state for the
+ * active option. The datetime input slides in smoothly with a transition.
  */
 
 .time-filter {
@@ -21,41 +21,88 @@
   font-size: 0.8125rem;
   font-weight: 600;
   color: var(--color-text);
+  margin-bottom: var(--space-xs);
 }
 
 .time-filter__options {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-xs);
-  margin-top: var(--space-xs);
 }
 
 .time-filter__option {
   display: inline-flex;
   align-items: center;
   gap: var(--space-xs);
-  padding: 0.5rem var(--space-sm);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
+  padding: 0.5rem 0.875rem;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-pill);
   background: var(--color-surface);
   cursor: pointer;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  transition: background-color var(--transition-fast),
+    border-color var(--transition-fast), color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.time-filter__option:hover {
+  border-color: var(--color-primary);
+  background: rgba(27, 79, 114, 0.04);
+}
+
+/* Filled state when the radio inside is checked. */
+.time-filter__option:has(input:checked) {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-primary-contrast);
+  box-shadow: var(--shadow-sm);
+}
+
+.time-filter__option:has(input:checked) .time-filter__option-label {
+  color: var(--color-primary-contrast);
 }
 
 .time-filter__option:focus-within {
   outline: 2px solid var(--color-primary);
-  outline-offset: 1px;
-  border-color: var(--color-primary);
+  outline-offset: 2px;
 }
 
+/* Hide the native radio visually but keep it accessible. */
 .time-filter__radio {
-  margin: 0;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
+.time-filter__option-label {
+  color: var(--color-text);
+  transition: color var(--transition-fast);
+}
+
+/* Datetime input — smooth reveal. */
 .time-filter__time {
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
+  animation: slideDown var(--transition-slow) ease forwards;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .time-filter__time-label {
@@ -66,17 +113,19 @@
 
 .time-filter__time-input {
   width: 100%;
-  padding: 0.625rem var(--space-sm);
-  font-size: 1rem; /* >= 16px avoids iOS zoom-on-focus */
+  padding: 0.625rem var(--space-md);
+  font-size: 1rem;
   color: var(--color-text);
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-input);
   line-height: 1.4;
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-base);
 }
 
 .time-filter__time-input:focus {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 1px;
+  outline: none;
   border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(27, 79, 114, 0.15), var(--shadow-sm);
 }

@@ -75,6 +75,9 @@ export function App(): JSX.Element {
   // Bumped to ask the controller to re-run the current search (retry, Req 3.4).
   const [retrySignal, setRetrySignal] = useState<number>(0);
 
+  // Timestamp of when the latest results were fetched (for the footer display).
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
   // Route a field's selection to the correct endpoint (Req 1.3). Editing or
   // clearing a field surfaces `null`, which we store as-is.
   const handleSelectLocation = useCallback(
@@ -94,6 +97,9 @@ export function App(): JSX.Element {
   const handleResult = useCallback((next: RouteResult | null): void => {
     setResult(next);
     setSelectedJourney(null);
+    if (next !== null) {
+      setLastUpdated(new Date());
+    }
   }, []);
 
   const handleSelectJourney = useCallback((journey: Journey): void => {
@@ -126,10 +132,21 @@ export function App(): JSX.Element {
     <div className="app-shell">
       <header className="app-header">
         <div className="app-header__inner">
-          <h1 className="app-header__title">TfNSW Route Planner</h1>
-          <p className="app-header__subtitle">
-            Find, compare, and choose the fastest or most economical trip.
-          </p>
+          <div>
+            <h1 className="app-header__title">TfNSW Route Planner</h1>
+            {origin && destination && (
+              <div className="app-header__summary">
+                <span>{origin.name}</span>
+                <span className="app-header__summary-arrow">→</span>
+                <span>{destination.name}</span>
+              </div>
+            )}
+            {!(origin && destination) && (
+              <p className="app-header__subtitle">
+                Find, compare, and choose the fastest or most economical trip.
+              </p>
+            )}
+          </div>
         </div>
       </header>
 
@@ -204,7 +221,17 @@ export function App(): JSX.Element {
       </main>
 
       <footer className="app-footer">
-        Powered by the Transport for NSW Open Data Trip Planner.
+        {lastUpdated && (
+          <span className="app-footer__updated">
+            Real-time data updated at{' '}
+            {lastUpdated.toLocaleTimeString([], {
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true,
+            })}
+          </span>
+        )}
+        <span>Powered by the Transport for NSW Open Data Trip Planner.</span>
       </footer>
     </div>
   );

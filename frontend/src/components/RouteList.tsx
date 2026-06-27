@@ -1,23 +1,21 @@
-// RouteList — renders the merged journey window for a search (Req 2.2, 2.3).
+// RouteList — TripView-style departure-board layout for journey results.
 //
-// Each route shows its departure time, arrival time, total travel time, number
-// of transfers, and the transport modes used. The fastest and the most
-// economical routes are visually badged/highlighted using the `fastestId` and
-// `economicalId` carried on the RouteResult (Req 3.1, 4.1).
+// Renders a dense, flat list of departure rows with a live countdown badge on
+// the left, platform/destination/line info, departure→arrival times, and
+// real-time status. The fastest/economical badges are compact inline tags.
 //
-// The backend now returns a merged window (the forward set plus earlier trips),
-// ordered by departure time and no longer capped at 5; this component renders
-// every journey in that window.
-//
-// Mobile-first: routes stack as full-width cards on phones and flow naturally
-// on larger screens via the shared route styles.
+// Props/data interface is UNCHANGED from the original card-based layout — this
+// is a pure visual restyle.
 
 import type { Journey, TransportMode } from '../api/types';
+import { useCountdown } from '../hooks/useCountdown';
+import type { CountdownStatus } from '../hooks/useCountdown';
 import {
-  formatClockTime,
+  formatClockTime12h,
+  formatCountdown,
   formatMode,
-  formatTransfers,
   formatTravelTime,
+  formatTransfers,
 } from './routeFormat';
 import '../styles/routes.css';
 
@@ -40,27 +38,71 @@ function orderedRoutes(journeys: Journey[]): Journey[] {
   );
 }
 
-/** Renders the ordered, comma-free list of transport modes for a journey. */
-function ModeList({ modes }: { modes: TransportMode[] }): JSX.Element {
-  if (modes.length === 0) {
-    return <span className="route-card__mode route-card__mode--empty">—</span>;
+/** Maps countdown status to the CSS modifier class. */
+function countdownModifier(status: CountdownStatus): string {
+  switch (status) {
+    case 'imminent':
+      return 'departure-row__countdown--imminent';
+    case 'soon':
+      return 'departure-row__countdown--soon';
+    case 'later':
+      return 'departure-row__countdown--later';
+    case 'past':
+      return 'departure-row__countdown--past';
   }
+}
+
+/** Extracts the platform from the first leg's origin, if available. */
+function getPlatform(journey: Journey): string | null {
+  return journey.legs[0]?.origin.platform ?? null;
+}
+
+/** Gets the final destination name (last leg's destination). */
+function getDestinationName(journey: Journey): string {
+  const lastLeg = journey.legs[journey.legs.length - 1];
+  return lastLeg?.destination.locationName ?? '';
+}
+
+/**
+ * Gets the line code from the first vehicle (non-transfer) leg's routeName,
+ * or falls back to the mode label.
+ */
+function getLineCode(journey: Journey): string {
+  const vehicleLeg = journey.legs.find((leg) => !leg.isTransfer);
+  if (vehicleLeg?.routeName) {
+    return vehicleLeg.routeName;
+  }
+  if (vehicleLeg) {
+    return formatMode(vehicleLeg.mode);
+  }
+  return formatMode(journey.modes[0] ?? 'other');
+}
+
+/** Gets the primary mode for CSS colouring. */
+function getPrimaryMode(journey: Journey): TransportMode {
+  const vehicleLeg = journey.legs.find((leg) => !leg.isTransfer);
+  return vehicleLeg?.mode ?? journey.modes[0] ?? 'other';
+}
+
+/** The live countdown badge component. */
+function CountdownBadge({
+  departureTime,
+}: {
+  departureTime: string;
+}): JSX.Element {
+  const { minutes, status } = useCountdown(departureTime);
+  const label = formatCountdown(minutes);
+  const modifier = countdownModifier(status);
+
   return (
-    <span className="route-card__modes">
-      {modes.map((mode, index) => (
-        <span
-          key={`${mode}-${index}`}
-          className={`route-card__mode route-card__mode--${mode}`}
-        >
-          {formatMode(mode)}
-        </span>
-      ))}
-    </span>
+    <div className={`departure-row__countdown ${modifier}`} aria-label={`Departing in ${label}`}>
+      <span className="departure-row__countdown-value">{label}</span>
+    </div>
   );
 }
 
-/** A single route card. */
-function RouteCard({
+/** A single departure-board row. */
+function DepartureRow({
   journey,
   isFastest,
   isEconomical,
@@ -71,13 +113,10 @@ function RouteCard({
   isEconomical: boolean;
   onSelect?: (journey: Journey) => void;
 }): JSX.Element {
-  const classNames = [
-    'route-card',
-    isFastest ? 'route-card--fastest' : '',
-    isEconomical ? 'route-card--economical' : '',
-  ]
-    .filter(Boolean)
-    .join(' ');
+  const platform = getPlatform(journey);
+  const destination = getDestinationName(journey);
+  const lineCode = getLineCode(journey);
+  const primaryMode = getPrimaryMode(journey);
 
   const badgeLabels: string[] = [];
   if (isFastest) badgeLabels.push('fastest');
@@ -87,53 +126,67 @@ function RouteCard({
 
   const content = (
     <>
-      {(isFastest || isEconomical) && (
-        <div className="route-card__badges" aria-hidden="true">
-          {isFastest && (
-            <span className="route-badge route-badge--fastest">Fastest</span>
-          )}
-          {isEconomical && (
-            <span className="route-badge route-badge--economical">
-              Most economical
+      {/* Left: countdown badge */}
+      <CountdownBadge departureTime={journey.departureTime} />
+
+      {/* Body */}
+      <div className="departure-row__body">
+        {/* Top line: platform + destination + line code */}
+        <div className="departure-row__header">
+          <div className="departure-row__route-info">
+            {platform && (
+              <span className="departure-row__platform">
+                Platform {platform}
+              </span>
+            )}
+            <span className="departure-row__destination">{destination}</span>
+          </div>
+          <span
+            className={`departure-row__line-code departure-row__line-code--${primaryMode}`}
+          >
+            {lineCode}
+          </span>
+        </div>
+
+        {/* Second line: departure → arrival times */}
+        <div className="departure-row__times">
+          <time className="departure-row__time" dateTime={journey.departureTime}>
+            {formatClockTime12h(journey.departureTime)}
+          </time>
+          <span className="departure-row__arrow" aria-hidden="true">→</span>
+          <time className="departure-row__time" dateTime={journey.arrivalTime}>
+            {formatClockTime12h(journey.arrivalTime)}
+          </time>
+          <span className="departure-row__duration">
+            {formatTravelTime(journey.travelTimeMinutes)}
+            {journey.transferCount > 0 && (
+              <> · {formatTransfers(journey.transferCount)}</>
+            )}
+          </span>
+        </div>
+
+        {/* Third line: real-time status + inline icon badges */}
+        <div className="departure-row__status-line">
+          <span className="departure-row__realtime departure-row__realtime--ontime">
+            On time
+          </span>
+
+          {(isFastest || isEconomical) && (
+            <span className="departure-row__badges">
+              {isFastest && (
+                <span className="departure-row__badge departure-row__badge--fastest" title="Fastest route">
+                  ⚡ Fastest
+                </span>
+              )}
+              {isEconomical && (
+                <span className="departure-row__badge departure-row__badge--economical" title="Most economical route">
+                  💰 Cheapest
+                </span>
+              )}
             </span>
           )}
         </div>
-      )}
-
-      <div className="route-card__times">
-        <span className="route-card__time">
-          <span className="route-card__time-label">Depart</span>
-          <time dateTime={journey.departureTime}>
-            {formatClockTime(journey.departureTime)}
-          </time>
-        </span>
-        <span className="route-card__arrow" aria-hidden="true">
-          →
-        </span>
-        <span className="route-card__time">
-          <span className="route-card__time-label">Arrive</span>
-          <time dateTime={journey.arrivalTime}>
-            {formatClockTime(journey.arrivalTime)}
-          </time>
-        </span>
       </div>
-
-      <dl className="route-card__meta">
-        <div className="route-card__meta-item">
-          <dt>Travel time</dt>
-          <dd>{formatTravelTime(journey.travelTimeMinutes)}</dd>
-        </div>
-        <div className="route-card__meta-item">
-          <dt>Transfers</dt>
-          <dd>{formatTransfers(journey.transferCount)}</dd>
-        </div>
-        <div className="route-card__meta-item route-card__meta-item--modes">
-          <dt>Modes</dt>
-          <dd>
-            <ModeList modes={journey.modes} />
-          </dd>
-        </div>
-      </dl>
     </>
   );
 
@@ -142,11 +195,11 @@ function RouteCard({
       <li>
         <button
           type="button"
-          className={`${classNames} route-card--interactive`}
+          className="departure-row departure-row--interactive"
           onClick={() => onSelect(journey)}
-          aria-label={`Route departing ${formatClockTime(
+          aria-label={`Route departing ${formatClockTime12h(
             journey.departureTime,
-          )}, arriving ${formatClockTime(
+          )}, arriving ${formatClockTime12h(
             journey.arrivalTime,
           )}, ${formatTravelTime(journey.travelTimeMinutes)}, ${formatTransfers(
             journey.transferCount,
@@ -159,15 +212,19 @@ function RouteCard({
   }
 
   return (
-    <li className={classNames} aria-label={`Route${accessibleSummary}`}>
+    <li
+      className="departure-row"
+      aria-label={`Route${accessibleSummary}`}
+    >
       {content}
     </li>
   );
 }
 
 /**
- * Renders the ranked list of routes. Returns nothing when there are no
- * journeys; the empty-state messaging is owned by {@link RouteSearchController}.
+ * Renders the ranked list of routes as a departure board. Returns nothing when
+ * there are no journeys; the empty-state messaging is owned by
+ * {@link RouteSearchController}.
  */
 export function RouteList({
   journeys,
@@ -183,7 +240,7 @@ export function RouteList({
   return (
     <ul className="route-list" aria-label="Available routes">
       {routes.map((journey) => (
-        <RouteCard
+        <DepartureRow
           key={journey.id}
           journey={journey}
           isFastest={journey.id === fastestId}

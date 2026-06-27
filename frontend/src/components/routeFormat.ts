@@ -73,3 +73,31 @@ const MODE_LABELS: Record<TransportMode, string> = {
 export function formatMode(mode: TransportMode): string {
   return MODE_LABELS[mode] ?? 'Other';
 }
+
+/**
+ * Formats a countdown in minutes into a TripView-style label.
+ * Negative values (past departures) → "Due", 0 → "Now", 1 → "1 min",
+ * n → "n mins".
+ */
+export function formatCountdown(minutes: number): string {
+  if (minutes < 0) return 'Due';
+  if (minutes === 0) return 'Now';
+  if (minutes === 1) return '1 min';
+  return `${minutes} mins`;
+}
+
+/**
+ * Formats an ISO 8601 timestamp as a 12-hour clock time (e.g. "8:57 am").
+ * Falls back to the raw string if it cannot be parsed.
+ */
+export function formatClockTime12h(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return iso;
+  }
+  return date.toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}

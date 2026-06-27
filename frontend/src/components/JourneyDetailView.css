@@ -1,10 +1,8 @@
-/* JourneyDetailView styles.
+/* JourneyDetailView styles — Vertical connected timeline.
  *
- * Mobile-first: the journey renders as a single vertical timeline of legs that
- * fills the available width on phones. From the tablet breakpoint up, each
- * leg's two stops sit side by side and the summary meta spreads horizontally.
- * Modes are distinguished by a labelled badge (not colour alone) so the detail
- * is legible without relying on colour perception.
+ * Mobile-first: renders as a connected vertical timeline with coloured lines
+ * on the left, stop dots as circles, mode badge at each leg start. Transfer
+ * legs use dashed grey segments. Fares shown as subtle chips with "(est.)".
  */
 
 .journey-detail {
@@ -31,7 +29,7 @@
 .journey-detail__message {
   margin: 0;
   padding: var(--space-sm) var(--space-md);
-  border-radius: 8px;
+  border-radius: var(--radius-input);
   font-size: 0.875rem;
   color: var(--color-text-muted);
   background: var(--color-bg);
@@ -61,8 +59,13 @@
   color: var(--color-primary-contrast);
   background: var(--color-primary);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-input);
   cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.journey-detail__retry:hover {
+  background: #14405d;
 }
 
 .journey-detail__retry:focus-visible {
@@ -76,17 +79,18 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
-  padding: var(--space-md);
+  padding: var(--space-lg);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-sm);
 }
 
 .journey-detail__summary-times {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  font-size: 1.25rem;
+  font-size: 1.375rem;
   font-weight: 700;
 }
 
@@ -101,11 +105,17 @@
   margin: 0;
 }
 
+.journey-detail__summary-meta > div {
+  display: flex;
+  flex-direction: column;
+}
+
 .journey-detail__summary-meta dt {
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
   color: var(--color-text-muted);
+  font-weight: 500;
 }
 
 .journey-detail__summary-meta dd {
@@ -114,15 +124,28 @@
   font-weight: 600;
 }
 
-/* Legs timeline --------------------------------------------------------------*/
+/* Legs timeline — connected vertical line on left. ---------------------------*/
 
 .journey-detail__legs {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0 0 0 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
+  gap: 0;
+  position: relative;
+}
+
+/* Vertical connector line. */
+.journey-detail__legs::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 7px;
+  width: 3px;
+  background: var(--color-border);
+  border-radius: 2px;
 }
 
 .journey-detail__leg {
@@ -130,19 +153,53 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
-  padding: var(--space-md);
+  padding: var(--space-md) var(--space-md) var(--space-md) var(--space-md);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-left: 4px solid var(--color-primary);
-  border-radius: 10px;
+  border-radius: var(--radius-card);
+  margin-bottom: var(--space-sm);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Coloured dot on the timeline line. */
+.journey-detail__leg::before {
+  content: '';
+  position: absolute;
+  left: calc(-1.5rem - 2px);
+  top: 1.25rem;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  border: 3px solid var(--color-surface);
+  box-shadow: 0 0 0 2px var(--color-primary);
+  z-index: 1;
+}
+
+/* Mode-specific dot colours. */
+.journey-detail__leg--train::before { background: var(--color-train); box-shadow: 0 0 0 2px var(--color-train); }
+.journey-detail__leg--metro::before { background: var(--color-metro); box-shadow: 0 0 0 2px var(--color-metro); }
+.journey-detail__leg--bus::before { background: var(--color-bus); box-shadow: 0 0 0 2px var(--color-bus); }
+.journey-detail__leg--ferry::before { background: var(--color-ferry); box-shadow: 0 0 0 2px var(--color-ferry); }
+.journey-detail__leg--lightRail::before { background: var(--color-lightRail); box-shadow: 0 0 0 2px var(--color-lightRail); }
+.journey-detail__leg--coach::before { background: var(--color-coach); box-shadow: 0 0 0 2px var(--color-coach); }
+.journey-detail__leg--school::before { background: var(--color-school); box-shadow: 0 0 0 2px var(--color-school); }
+
+/* Transfer / walk legs — dashed line, grey dot. */
+.journey-detail__leg--walk::before,
+.journey-detail__leg--transfer::before {
+  background: var(--color-walk);
+  box-shadow: 0 0 0 2px var(--color-walk);
 }
 
 .journey-detail__leg--walk,
 .journey-detail__leg--transfer {
-  border-left-style: dashed;
-  border-left-color: var(--color-text-muted);
+  background: rgba(108, 117, 125, 0.04);
+  border-style: dashed;
+  border-color: var(--color-walk);
 }
 
+/* Mode badge at start of each leg. */
 .journey-detail__leg-mode {
   display: flex;
   flex-wrap: wrap;
@@ -151,22 +208,36 @@
 }
 
 .journey-detail__mode-badge {
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   font-weight: 700;
-  padding: 2px 10px;
-  border-radius: 999px;
-  background: rgba(10, 79, 143, 0.1);
-  color: var(--color-primary);
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  color: #fff;
 }
+
+.journey-detail__mode-badge--train { background: var(--color-train); }
+.journey-detail__mode-badge--metro { background: var(--color-metro); }
+.journey-detail__mode-badge--bus { background: var(--color-bus); color: #003d4d; }
+.journey-detail__mode-badge--ferry { background: var(--color-ferry); }
+.journey-detail__mode-badge--lightRail { background: var(--color-lightRail); }
+.journey-detail__mode-badge--coach { background: var(--color-coach); }
+.journey-detail__mode-badge--school { background: var(--color-school); color: #3d2700; }
+.journey-detail__mode-badge--walk { background: var(--color-walk); }
+.journey-detail__mode-badge--bicycle { background: #6C757D; }
+.journey-detail__mode-badge--other { background: #ADB5BD; color: var(--color-text); }
 
 .journey-detail__transfer-tag {
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--color-text-muted);
+  letter-spacing: 0.04em;
+  color: var(--color-walk);
+  padding: 2px 6px;
+  border: 1px solid var(--color-walk);
+  border-radius: var(--radius-pill);
 }
 
+/* Stop details. */
 .journey-detail__leg-stops {
   display: flex;
   flex-direction: column;
@@ -180,15 +251,17 @@
 }
 
 .journey-detail__stop-role {
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
   color: var(--color-text-muted);
+  font-weight: 500;
 }
 
 .journey-detail__stop-name {
   font-size: 0.9375rem;
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--color-text);
 }
 
 .journey-detail__stop-time {
@@ -197,13 +270,15 @@
   align-items: baseline;
   gap: var(--space-sm);
   font-size: 0.875rem;
+  color: var(--color-text-muted);
 }
 
+/* Platform badge. */
 .journey-detail__platform {
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   font-weight: 600;
-  padding: 1px 8px;
-  border-radius: 6px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   color: var(--color-text-muted);
@@ -222,21 +297,27 @@
   color: var(--color-text-muted);
 }
 
+/* Fare chip. */
 .journey-detail__leg-fare {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 700;
   color: var(--color-text);
+  padding: 2px 10px;
+  background: rgba(13, 110, 253, 0.08);
+  border-radius: var(--radius-pill);
 }
 
 .journey-detail__leg-fare--missing {
   font-weight: 500;
   color: var(--color-text-muted);
+  background: transparent;
+  padding: 0;
 }
 
 /* Fare estimate indicators ---------------------------------------------------*/
 
 .journey-detail__leg-fare-estimate {
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
   font-weight: 500;
   color: var(--color-text-muted);
 }
@@ -254,6 +335,9 @@
   font-size: 0.75rem;
   font-style: italic;
   color: var(--color-text-muted);
+  padding: var(--space-xs) var(--space-sm);
+  background: rgba(13, 110, 253, 0.04);
+  border-radius: var(--radius-input);
 }
 
 @media (min-width: 600px) {
@@ -264,5 +348,9 @@
 
   .journey-detail__stop {
     flex: 1;
+  }
+
+  .journey-detail__summary-times {
+    font-size: 1.5rem;
   }
 }

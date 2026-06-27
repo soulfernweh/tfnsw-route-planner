@@ -1,16 +1,15 @@
-/* Global, mobile-first base styles and design tokens.
+/* Global design tokens and mobile-first base styles.
  *
- * Breakpoints follow a mobile-first strategy: base rules target phones, and
- * `min-width` media queries progressively enhance for tablet and desktop.
+ * Breakpoints (mobile-first):
  *   - phone:   < 600px   (base, no media query)
  *   - tablet:  >= 600px
- *   - desktop: >= 1024px
+ *   - desktop: >= 768px
  */
 
 :root {
   /* Breakpoint reference values (documented; CSS media queries use literals). */
   --bp-tablet: 600px;
-  --bp-desktop: 1024px;
+  --bp-desktop: 768px;
 
   /* Spacing scale. */
   --space-xs: 0.25rem;
@@ -22,14 +21,48 @@
   /* Layout. */
   --content-max-width: 1100px;
 
-  /* Palette. */
-  --color-bg: #f5f6f8;
+  /* Palette — TfNSW travel-app focused. */
+  --color-bg: #f4f5f7;
   --color-surface: #ffffff;
-  --color-border: #e2e5ea;
-  --color-text: #1c2330;
-  --color-text-muted: #5b6472;
-  --color-primary: #0a4f8f; /* TfNSW-style transport blue */
-  --color-primary-contrast: #ffffff;
+  --color-surface-warm: #fafaf8;
+  --color-border: #e0e3e8;
+  --color-text: #1a1d23;
+  --color-text-muted: #5f6773;
+  --color-primary: #002664;
+  --color-primary-dark: #001a46;
+  --color-primary-contrast: #FFFFFF;
+  --color-header: #0b1528;
+
+  /* Transit mode colours. */
+  --color-train: #0051A5;
+  --color-metro: #008C95;
+  --color-bus: #00B4D8;
+  --color-ferry: #2D6A4F;
+  --color-lightRail: #E63946;
+  --color-coach: #7B2D8B;
+  --color-school: #F4A300;
+  --color-walk: #6C757D;
+
+  /* Semantic. */
+  --color-success: #198754;
+  --color-economy: #0D6EFD;
+  --color-error: #DC3545;
+
+  /* Elevation / shadows. */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-xl: 0 12px 36px rgba(0, 0, 0, 0.14);
+
+  /* Radii. */
+  --radius-card: 12px;
+  --radius-input: 8px;
+  --radius-pill: 999px;
+
+  /* Transitions. */
+  --transition-fast: 150ms ease;
+  --transition-base: 200ms ease;
+  --transition-slow: 300ms ease;
 
   /* Typography. */
   --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial,
@@ -55,6 +88,7 @@ body {
   background: var(--color-bg);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 h1,
@@ -62,4 +96,19 @@ h2,
 h3 {
   margin: 0 0 var(--space-sm);
   line-height: 1.25;
+}
+
+/* Smooth transitions for interactive elements globally. */
+button,
+input,
+select,
+textarea {
+  transition: border-color var(--transition-fast),
+    box-shadow var(--transition-fast), background-color var(--transition-fast);
+}
+
+/* Focus ring utility for custom focus styles. */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }

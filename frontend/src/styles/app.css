@@ -1,8 +1,8 @@
-/* App shell layout.
+/* App shell layout — TripView-style travel app.
  *
- * Mobile-first: the search and results regions stack vertically on phones and
- * sit side by side from the desktop breakpoint up, so the same components scale
- * from phone to desktop (easing the later Android port).
+ * Mobile-first: compact dark header with origin→destination summary bar,
+ * collapsible filter row, dense departure-board results. Desktop: side-by-side
+ * search and results layout.
  */
 
 .app-shell {
@@ -11,69 +11,105 @@
   min-height: 100%;
 }
 
+/* Header — near-black / TfNSW navy, compact, sticky. */
 .app-header {
-  background: var(--color-primary);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--color-header, #0b1528);
   color: var(--color-primary-contrast);
-  padding: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
 .app-header__inner {
   width: 100%;
   max-width: var(--content-max-width);
   margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
 }
 
 .app-header__title {
   margin: 0;
-  font-size: 1.125rem;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .app-header__subtitle {
-  margin: var(--space-xs) 0 0;
-  font-size: 0.8125rem;
-  opacity: 0.85;
+  margin: 0;
+  font-size: 0.75rem;
+  opacity: 0.7;
+  font-weight: 400;
 }
 
+/* Summary bar — shows origin→destination inline in the header area. */
+.app-header__summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.app-header__summary-arrow {
+  opacity: 0.5;
+}
+
+/* Main content area. */
 .app-main {
   flex: 1;
   width: 100%;
   max-width: var(--content-max-width);
   margin: 0 auto;
-  padding: var(--space-md);
+  padding: var(--space-sm) var(--space-sm);
 }
 
 /* Region container: stacked on phones. */
 .app-layout {
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
+  gap: var(--space-sm);
 }
 
+/* Each region is a clean elevated card with warmer surface. */
 .app-region {
-  background: var(--color-surface);
+  background: var(--color-surface-warm, var(--color-surface));
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   padding: var(--space-md);
+  box-shadow: var(--shadow-sm);
 }
 
 .app-region__heading {
-  font-size: 1rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0 0 var(--space-sm);
 }
 
-/* Stacked origin/destination inputs with comfortable spacing. */
+/* Stacked origin/destination inputs with compact spacing. */
 .app-search-fields {
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
-  margin-bottom: var(--space-md);
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
 }
 
-/* Time filter + mode selection grouped above the search action. */
+/* Time filter + mode selection — collapsible row below the header. */
 .app-search-filters {
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
-  margin-bottom: var(--space-md);
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+  padding: var(--space-sm);
+  background: var(--color-bg);
+  border-radius: var(--radius-input);
+  border: 1px solid var(--color-border);
 }
 
 /* Comparison + detail stack vertically within the results region. */
@@ -87,31 +123,40 @@
   color: var(--color-text-muted);
   font-size: 0.875rem;
   border: 1px dashed var(--color-border);
-  border-radius: 8px;
-  padding: var(--space-md);
+  border-radius: var(--radius-input);
+  padding: var(--space-lg) var(--space-md);
   text-align: center;
 }
 
+/* Footer — real-time update info + attribution. */
 .app-footer {
-  padding: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
   text-align: center;
   color: var(--color-text-muted);
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-/* Tablet: a touch more breathing room. */
+.app-footer__updated {
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+/* Tablet: more breathing room. */
 @media (min-width: 600px) {
   .app-header__title {
-    font-size: 1.375rem;
+    font-size: 1.125rem;
   }
 
   .app-main {
-    padding: var(--space-lg);
+    padding: var(--space-md);
   }
 }
 
-/* Desktop: search and results side by side. */
-@media (min-width: 1024px) {
+/* Desktop: search panel left, results/detail right. */
+@media (min-width: 768px) {
   .app-layout {
     flex-direction: row;
     align-items: flex-start;
@@ -120,7 +165,7 @@
   .app-region--search {
     flex: 0 0 360px;
     position: sticky;
-    top: var(--space-lg);
+    top: 60px;
   }
 
   .app-region--results {

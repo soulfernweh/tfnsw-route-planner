@@ -1,9 +1,8 @@
-/* Route search + route list styles.
+/* Route search + departure-board styles — TripView-style dense departure rows.
  *
- * Mobile-first: route cards render as full-width, comfortably tappable cards on
- * phones, and gain a little more horizontal layout from the tablet breakpoint
- * up. Fastest / economical routes are highlighted with a coloured edge and a
- * badge so they are distinguishable without relying on colour alone.
+ * Mobile-first: rows are compact, full-width with a coloured countdown badge
+ * on the left edge, platform/destination/times in the body, and a line-code
+ * pill on the right. Minimal padding, clear visual hierarchy.
  */
 
 .route-search {
@@ -18,27 +17,40 @@
 
 .route-search__button {
   flex: 1;
-  min-height: 44px; /* comfortable touch target */
+  min-height: 48px;
   padding: var(--space-sm) var(--space-md);
   font-size: 1rem;
   font-weight: 600;
   color: var(--color-primary-contrast);
   background: var(--color-primary);
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-input);
   cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: background-color var(--transition-fast),
+    box-shadow var(--transition-fast), transform var(--transition-fast);
+}
+
+.route-search__button:hover:not(:disabled) {
+  background: #14405d;
+  box-shadow: var(--shadow-md);
+}
+
+.route-search__button:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .route-search__button:disabled {
   background: var(--color-border);
   color: var(--color-text-muted);
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .route-search__message {
   margin: 0;
   padding: var(--space-sm) var(--space-md);
-  border-radius: 8px;
+  border-radius: var(--radius-input);
   font-size: 0.875rem;
 }
 
@@ -55,7 +67,7 @@
   border: 1px dashed var(--color-border);
 }
 
-/* Route list ---------------------------------------------------------------*/
+/* Route list — departure board ------------------------------------------------*/
 
 .route-list {
   list-style: none;
@@ -63,145 +75,315 @@
   padding: 0;
   display: flex;
   flex-direction: column;
+  gap: 2px;
+  background: var(--color-border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+/* Departure row — dense, flat, TripView-inspired layout. */
+.departure-row {
+  display: flex;
+  align-items: stretch;
+  background: var(--color-surface);
+  padding: var(--space-sm) var(--space-md);
+  gap: var(--space-md);
+  border: none;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition: background-color var(--transition-fast);
+}
+
+.departure-row--interactive {
+  cursor: pointer;
+}
+
+.departure-row--interactive:hover {
+  background: #f0f4f8;
+}
+
+.departure-row--interactive:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+  background: #f0f4f8;
+}
+
+/* Left: Countdown badge — bold coloured block. */
+.departure-row__countdown {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 58px;
+  max-width: 64px;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: 6px;
+  font-weight: 800;
+  font-size: 0.8125rem;
+  line-height: 1.2;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.departure-row__countdown-value {
+  white-space: nowrap;
+}
+
+/* Imminence colours — green when ≤5 min */
+.departure-row__countdown--imminent {
+  background: #198754;
+  color: #fff;
+}
+
+/* Yellow/amber when 6–15 min */
+.departure-row__countdown--soon {
+  background: #f59e0b;
+  color: #1a1a1a;
+}
+
+/* Orange when 16+ min */
+.departure-row__countdown--later {
+  background: #ea580c;
+  color: #fff;
+}
+
+/* Grey when departed */
+.departure-row__countdown--past {
+  background: #9ca3af;
+  color: #fff;
+}
+
+/* Body — center content area with header, times, and status. */
+.departure-row__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+
+/* Header line: platform/destination + line code on right */
+.departure-row__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-sm);
 }
 
-.route-card {
-  display: block;
-  width: 100%;
-  text-align: left;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-left: 4px solid var(--color-border);
-  border-radius: 10px;
-  padding: var(--space-md);
-}
-
-.route-card--interactive {
-  cursor: pointer;
-  font: inherit;
-  color: inherit;
-}
-
-.route-card--interactive:hover,
-.route-card--interactive:focus-visible {
-  border-color: var(--color-primary);
-  outline: none;
-}
-
-/* Highlight the fastest / economical routes (Req 3.1, 4.1). */
-.route-card--fastest {
-  border-left-color: #1f7a3d; /* green edge for fastest */
-}
-
-.route-card--economical {
-  border-left-color: #b5780a; /* amber edge for economical */
-}
-
-.route-card--fastest.route-card--economical {
-  /* When a single route is both, prefer the fastest edge but keep both badges. */
-  border-left-color: #1f7a3d;
-}
-
-.route-card__badges {
+.departure-row__route-info {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-xs);
-  margin-bottom: var(--space-sm);
+  min-width: 0;
+  overflow: hidden;
 }
 
-.route-badge {
+.departure-row__platform {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.departure-row__platform::after {
+  content: '→';
+  margin-left: var(--space-xs);
+  color: var(--color-text-muted);
+}
+
+.departure-row__destination {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Line code pill — small rounded badge on the right. */
+.departure-row__line-code {
   font-size: 0.6875rem;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+  flex-shrink: 0;
+  color: #fff;
 }
 
-.route-badge--fastest {
-  color: #0f5226;
-  background: #d8f0e0;
+.departure-row__line-code--train {
+  background: var(--color-train);
 }
 
-.route-badge--economical {
-  color: #7a5206;
-  background: #f7e6c4;
+.departure-row__line-code--metro {
+  background: var(--color-metro);
 }
 
-.route-card__times {
+.departure-row__line-code--bus {
+  background: var(--color-bus);
+  color: #003d4d;
+}
+
+.departure-row__line-code--ferry {
+  background: var(--color-ferry);
+}
+
+.departure-row__line-code--lightRail {
+  background: var(--color-lightRail);
+}
+
+.departure-row__line-code--coach {
+  background: var(--color-coach);
+}
+
+.departure-row__line-code--school {
+  background: var(--color-school);
+  color: #3d2700;
+}
+
+.departure-row__line-code--walk {
+  background: var(--color-walk);
+}
+
+.departure-row__line-code--bicycle {
+  background: #6c757d;
+}
+
+.departure-row__line-code--other {
+  background: #adb5bd;
+  color: var(--color-text);
+}
+
+/* Times line — departure → arrival + duration */
+.departure-row__times {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+.departure-row__time {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.departure-row__arrow {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.departure-row__duration {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-left: auto;
+}
+
+/* Status line — real-time indicator + inline badges */
+.departure-row__status-line {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  font-size: 1.125rem;
-  font-weight: 600;
-}
-
-.route-card__time {
-  display: flex;
-  flex-direction: column;
-}
-
-.route-card__time-label {
-  font-size: 0.6875rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--color-text-muted);
-}
-
-.route-card__arrow {
-  color: var(--color-text-muted);
-}
-
-.route-card__meta {
-  display: flex;
   flex-wrap: wrap;
-  gap: var(--space-md);
-  margin: var(--space-sm) 0 0;
 }
 
-.route-card__meta-item {
-  display: flex;
-  flex-direction: column;
-}
-
-.route-card__meta-item dt {
+.departure-row__realtime {
   font-size: 0.6875rem;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--color-text-muted);
-}
-
-.route-card__meta-item dd {
-  margin: 0;
-  font-size: 0.875rem;
   font-weight: 600;
-}
-
-.route-card__modes {
   display: inline-flex;
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.departure-row__realtime--ontime {
+  color: #198754;
+}
+
+.departure-row__realtime--ontime::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #198754;
+}
+
+.departure-row__realtime--delayed {
+  color: #dc3545;
+}
+
+.departure-row__realtime--scheduled {
+  color: var(--color-text-muted);
+}
+
+.departure-row__realtime--scheduled::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #198754;
+}
+
+/* Inline badge icons for fastest/economical */
+.departure-row__badges {
+  display: inline-flex;
+  align-items: center;
   gap: var(--space-xs);
 }
 
-.route-card__mode {
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 6px;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
+.departure-row__badge {
+  font-size: 0.625rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
-.route-card__mode--empty {
+.departure-row__badge--fastest {
+  color: #fff;
+  background: var(--color-success);
+}
+
+.departure-row__badge--economical {
+  color: #fff;
+  background: var(--color-economy);
+}
+
+/* Transfer note below main row content */
+.departure-row__transfers {
+  font-size: 0.6875rem;
   color: var(--color-text-muted);
-  border: none;
-  background: transparent;
+  margin-top: 1px;
+}
+
+/* Last-updated footer */
+.route-list__updated {
+  font-size: 0.6875rem;
+  color: var(--color-text-muted);
+  text-align: center;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
 }
 
 @media (min-width: 600px) {
-  .route-card__times {
-    font-size: 1.25rem;
+  .departure-row__time {
+    font-size: 1.125rem;
+  }
+
+  .departure-row__countdown {
+    min-width: 64px;
+    font-size: 0.875rem;
+  }
+
+  .departure-row__destination {
+    font-size: 0.9375rem;
   }
 }
