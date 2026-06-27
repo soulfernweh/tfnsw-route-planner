@@ -320,3 +320,58 @@ describe('Wired backend: validation errors (Req 2.5, Security)', () => {
     expect(response.body).not.toContain(TEST_API_KEY);
   });
 });
+
+// ---------------------------------------------------------------------------
+// (e) Mode selection (`modes`) — explicit-empty rejection + exclusion mapping
+// ---------------------------------------------------------------------------
+
+describe('Wired backend: GET /api/routes mode selection (Req 6.3, 6.4)', () => {
+  it('rejects an explicit empty `modes` (none selected) with 400 VALIDATION_ERROR', async () => {
+    const { deps, fetchFn } = makeDeps();
+
+    const response = await handleApiRequest(
+      ctx('/api/routes?originId=A&destinationId=B&modes='),
+      deps,
+    );
+
+    expect(response.status).toBe(400);
+    const body = JSON.parse(response.body) as { error: { code: string; message: string } };
+    expect(body.error.code).toBe('VALIDATION_ERROR');
+    expect(body.error.message.toLowerCase()).toContain('at least one transport mode');
+
+    // Validation short-circuits before any upstream/service work.
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect(response.body).not.toContain(TEST_API_KEY);
+  });
+
+  it('passes `modes=train,bus` through so the upstream trip excludes the other modes', async () => {
+    const { deps, fetchFn } = makeDeps();
+
+    const response = await handleApiRequest(
+      ctx('/api/routes?originId=A&destinationId=B&modes=train,bus'),
+      deps,
+    );
+
+    expect(response.status).toBe(200);
+
+    // The route service issues trip queries; gather every trip URL it fetched.
+    const tripUrls = fetchFn.mock.calls
+      .map((call) => String(call[0]))
+      .filter((url) => url.includes('trip'));
+    expect(tripUrls.length).toBeGreaterThan(0);
+
+    for (const url of tripUrls) {
+      // The complement of {train(1), bus(5)} is excluded: metro(2), lightRail(4),
+      // coach(7), ferry(9), school(11), with a single excludedMeans=checkbox.
+      expect(url).toContain('excludedMeans=checkbox');
+      expect(url).toContain('exclMOT_2=1');
+      expect(url).toContain('exclMOT_4=1');
+      expect(url).toContain('exclMOT_7=1');
+      expect(url).toContain('exclMOT_9=1');
+      expect(url).toContain('exclMOT_11=1');
+      // The included modes (train=1, bus=5) are NOT excluded.
+      expect(url).not.toContain('exclMOT_1=1');
+      expect(url).not.toContain('exclMOT_5=1');
+    }
+  });
+});

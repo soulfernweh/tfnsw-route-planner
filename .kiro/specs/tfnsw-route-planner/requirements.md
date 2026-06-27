@@ -10,7 +10,11 @@ The initial delivery target is a responsive web application accessible via deskt
 
 - **Route_Planner**: The application system that provides route planning functionality using TfNSW data
 - **TfNSW_API**: The Transport for NSW public API that provides transport data including stops, routes, and trips. The TfNSW_API does not return Opal fare data; fares are estimated by the Route_Planner from the Opal_Fares_Dataset
-- **Location**: A transport stop, station, platform, or point of interest that can serve as a trip origin or destination
+- **Location**: A transport stop, station, platform, point of interest, or address that can serve as a trip origin or destination. Each Location carries the set of public-transport modes it serves (its served Transport_Modes), which is used both for ordering Search_Results and for display
+- **Transport_Mode**: A category of TfNSW service that can operate a route leg: Train, Metro, Light Rail, Bus, Coach, Ferry, or School Bus
+- **Mode_Selection**: The set of Transport_Modes the user has chosen to include in route results; all Transport_Modes are included by default
+- **Time_Filter**: The user's chosen basis for route discovery, being one of "Leave now", "Leave at" a specified date and time, or "Arrive by" a specified date and time
+- **Selected_Time**: The date and time that drives route discovery, being the current time when the Time_Filter is "Leave now", or the user-specified date and time when the Time_Filter is "Leave at" or "Arrive by"
 - **Route**: A complete journey plan from origin to destination, including transfers and intermediate stops
 - **Fastest_Route**: The route option with the shortest total travel time from origin to destination
 - **Economical_Route**: The route option with the lowest total fare cost from origin to destination
@@ -30,10 +34,12 @@ The initial delivery target is a responsive web application accessible via deskt
 
 1. WHEN a user enters a search query of at least 3 characters in the origin or destination input field, THE Route_Planner SHALL query the TfNSW_API and return up to 10 matching locations within 3 seconds
 2. WHEN the TfNSW_API returns matching locations, THE Route_Planner SHALL display the location name, type, and suburb for each result in a selectable list
-3. WHEN a user selects a location from the Search_Results, THE Route_Planner SHALL store it as the value for the input field (origin or destination) in which the search was initiated
-4. IF the TfNSW_API returns no matching locations, THEN THE Route_Planner SHALL display a message indicating no locations were found for the given query
-5. IF the TfNSW_API is unreachable or returns an error, THEN THE Route_Planner SHALL display an error message indicating the service is temporarily unavailable and retain any previously entered text in the input field
-6. IF a user enters fewer than 3 characters in a search field, THEN THE Route_Planner SHALL NOT query the TfNSW_API and SHALL clear any previously displayed Search_Results
+3. WHEN the Route_Planner displays Search_Results, THE Route_Planner SHALL order the results into the following priority tiers, highest priority first: (tier 1) train and metro stations, (tier 2) ferry wharves, (tier 3) bus stops, (tier 4) other public-transport stops including light rail and coach, and (tier 5) addresses and points of interest
+4. WHILE ordering Search_Results within a single priority tier, THE Route_Planner SHALL order results by the TfNSW_API match quality with the best match first
+5. WHEN a user selects a location from the Search_Results, THE Route_Planner SHALL store it as the value for the input field (origin or destination) in which the search was initiated
+6. IF the TfNSW_API returns no matching locations, THEN THE Route_Planner SHALL display a message indicating no locations were found for the given query
+7. IF the TfNSW_API is unreachable or returns an error, THEN THE Route_Planner SHALL display an error message indicating the service is temporarily unavailable and retain any previously entered text in the input field
+8. IF a user enters fewer than 3 characters in a search field, THEN THE Route_Planner SHALL NOT query the TfNSW_API and SHALL clear any previously displayed Search_Results
 
 ### Requirement 2: Route Discovery
 
@@ -42,7 +48,7 @@ The initial delivery target is a responsive web application accessible via deskt
 #### Acceptance Criteria
 
 1. WHEN a user has selected both an origin and a destination, THE Route_Planner SHALL enable the route search function
-2. WHEN a user initiates a route search, THE Route_Planner SHALL query the TfNSW_API for available trips and display up to 5 route results within 5 seconds, ordered by earliest departure time
+2. WHEN a user initiates a route search for the Selected_Time, THE Route_Planner SHALL query the TfNSW_API for available trips and, within 5 seconds, display a set of routes that includes routes departing at or after the Selected_Time together with at least 5 earlier trip occasions before the Selected_Time, with all displayed routes ordered by earliest departure time
 3. WHEN routes are returned, THE Route_Planner SHALL display for each route: departure time, arrival time, total Travel_Time, number of transfers, and transport modes used
 4. IF no routes are available between the selected origin and destination, THEN THE Route_Planner SHALL inform the user that no routes were found and suggest selecting a different origin, destination, or travel time
 5. IF the origin and destination are the same location, THEN THE Route_Planner SHALL display a validation message and prevent route search
@@ -84,3 +90,26 @@ The initial delivery target is a responsive web application accessible via deskt
 4. WHEN the Fastest_Route and the Economical_Route are the same route, THE Route_Planner SHALL display a single route and indicate that it is both the fastest and most economical option
 5. WHEN a user selects a route from the Route_Comparison view, THE Route_Planner SHALL display the full journey details for the selected route including each leg, departure and arrival times, and transport mode
 6. IF fare information is unavailable for the Fastest_Route, THEN THE Route_Planner SHALL display the Fastest_Route with a notice that fare data is unavailable and present only Travel_Time and transfer count for comparison
+
+### Requirement 6: Transport Mode Selection
+
+**User Story:** As a commuter, I want to choose which transport modes are included in my route results, so that I can plan journeys that match my travel preferences.
+
+#### Acceptance Criteria
+
+1. THE Route_Planner SHALL provide a Mode_Selection control that lets the user include or exclude each of the following Transport_Modes: Train, Metro, Light Rail, Bus, Coach, Ferry, and School Bus
+2. WHEN a route search is initiated and the user has not changed the Mode_Selection, THE Route_Planner SHALL include all Transport_Modes in the route search
+3. WHEN a user deselects one or more Transport_Modes and initiates a route search, THE Route_Planner SHALL exclude services operated by the deselected Transport_Modes from the route results
+4. IF a user deselects all Transport_Modes and initiates a route search, THEN THE Route_Planner SHALL display a validation message indicating that at least one Transport_Mode is required and SHALL NOT perform the route search
+
+### Requirement 7: Departure and Arrival Time Filter
+
+**User Story:** As a commuter, I want to plan a journey for now, for a future departure time, or to arrive by a specific time, so that I can travel according to my schedule.
+
+#### Acceptance Criteria
+
+1. THE Route_Planner SHALL provide a Time_Filter control offering three options: "Leave now", "Leave at" a user-specified date and time, and "Arrive by" a user-specified date and time
+2. WHEN a user has not chosen a Time_Filter option, THE Route_Planner SHALL default the Time_Filter to "Leave now" and set the Selected_Time to the current time
+3. WHEN the Time_Filter is "Leave at" with a user-specified date and time, THE Route_Planner SHALL set the Selected_Time to that date and time and query the TfNSW_API for trips departing at or after the Selected_Time
+4. WHEN the Time_Filter is "Arrive by" with a user-specified date and time, THE Route_Planner SHALL set the Selected_Time to that date and time and query the TfNSW_API for trips arriving at or before the Selected_Time
+5. WHEN the Time_Filter is "Leave now", THE Route_Planner SHALL set the Selected_Time to the current time and query the TfNSW_API for trips departing at or after the Selected_Time

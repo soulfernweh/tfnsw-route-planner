@@ -180,6 +180,13 @@ describe('normaliseLocations completeness (Property 2)', () => {
           // normaliser drops entries that lack one).
           expect(typeof loc.id).toBe('string');
           expect(loc.id.length).toBeGreaterThan(0);
+
+          // Each Location additionally carries its served `modes` (an array,
+          // possibly empty for non-transit entries) and a numeric `matchQuality`
+          // (defaulting to 0 when absent) — Req 1.3, 1.4.
+          expect(Array.isArray(loc.modes)).toBe(true);
+          expect(typeof loc.matchQuality).toBe('number');
+          expect(Number.isFinite(loc.matchQuality)).toBe(true);
         }
       }),
       { numRuns: 200 },

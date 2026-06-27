@@ -88,22 +88,25 @@ sequenceDiagram
     B->>B: check cache
     B->>T: stop_finder (Authorization: apikey)
     T-->>B: EFA locations JSON
-    B->>B: normalise -> Location[] (max 10)
+    B->>B: normalise -> Location[] (carry modes + matchQuality)
+    B->>B: order by priority tier then matchQuality; cap at 10
     B-->>W: Location[]
-    W-->>U: selectable result list
+    W-->>U: selectable result list (shows type + modes)
 ```
 
-**Route discovery + ranking (Requirements 2-5):**
+**Route discovery + ranking (Requirements 2-7):**
 ```mermaid
 sequenceDiagram
     participant W as Web SPA
     participant B as Backend
     participant T as TfNSW API
-    W->>B: GET /api/routes?originId=&destId=&time=
-    B->>B: validate origin != destination
-    B->>T: trip request (Authorization: apikey)
-    T-->>B: EFA journeys JSON (no fares)
-    B->>B: normalise -> Journey[] (max 5, by departure)
+    W->>B: GET /api/routes?originId=&destId=&time=&when=&modes=
+    B->>B: validate origin != destination; validate when/modes (>=1 mode)
+    B->>B: derive depArr + excludedModes (complement of includedModes)
+    B->>T: trip forward query (depArr, calcNumberOfTrips~6, exclMOT for excluded)
+    B->>T: trip opposite-direction query (for earlier/later window)
+    T-->>B: EFA journeys JSON (no fares) x2
+    B->>B: merge + de-duplicate + order by departureTime (>=5 earlier when available)
     B->>B: compute per-leg Opal fare estimates (distance + mode)
     B->>B: assign synthetic journey ids; compute fastest, economical, comparison
     B-->>W: RouteResult { journeys, fastestId, economicalId, comparison }
@@ -113,9 +116,11 @@ sequenceDiagram
 
 ### Frontend Components
 
-- **LocationSearchField** — Debounced autocomplete input (origin and destination instances). Enforces the 3-character minimum, clears results below threshold, renders the selectable result list (name, type, suburb), and surfaces "no locations found" / "service unavailable" states while retaining typed text.
-- **RouteSearchController** — Enables route search only when both origin and destination are selected and they differ; otherwise shows the same-location validation message.
-- **RouteList** — Renders up to 5 routes ordered by departure time; shows departure/arrival, total travel time, transfers, and transport modes. Visually badges the fastest and the economical routes.
+- **LocationSearchField** — Debounced autocomplete input (origin and destination instances). Enforces the 3-character minimum, clears results below threshold, renders the selectable result list (name, type, suburb, and served **modes** to reflect prioritisation), and surfaces "no locations found" / "service unavailable" states while retaining typed text. Results arrive already ordered by priority tier then match quality.
+- **TimeFilterControl** — A Time_Filter control offering "Leave now", "Leave at", and "Arrive by", with a datetime input shown for the "Leave at" / "Arrive by" options. Defaults to **"Leave now"** (Req 7.1, 7.2). Emits the chosen filter and Selected_Time to the RouteSearchController.
+- **ModeSelectionControl** — Checkboxes for the seven selectable Transport_Modes (Train, Metro, Light Rail, Bus, Coach, Ferry, School Bus), **all selected (on) by default** (Req 6.1, 6.2). When the user deselects every mode and attempts a search, it shows the "at least one Transport_Mode is required" validation message and blocks the search (Req 6.4).
+- **RouteSearchController** — Enables route search only when both origin and destination are selected and they differ; otherwise shows the same-location validation message. Passes the `timeFilter` + Selected_Time + `includedModes` (from the Time Filter and Mode Selection controls) through to `planRoutes`, and enforces the all-modes-deselected validation before searching.
+- **RouteList** — Renders the merged journey window ordered by departure time (the forward set plus at least 5 earlier trips when available); shows departure/arrival, total travel time, transfers, and transport modes. Visually badges the fastest and the economical routes.
 - **JourneyDetailView** — Shows full leg-by-leg journey details (per-leg departure/arrival, mode, platform where available, and per-leg + total fare for the economical selection). Renders directly from the already-fetched journey data in the route result — no separate detail fetch is made — and clearly labels fares as estimates.
 - **RouteComparisonView** — Side-by-side fastest vs economical presentation with travel-time and fare differences and faster/cheaper labels. Collapses to a single route when they coincide. Handles the "fare unavailable for fastest route" notice.
 
@@ -130,8 +135,10 @@ interface LocationService {
 
 // Route Service
 interface RouteService {
-  // Validates inputs, fetches and normalises up to 5 journeys ordered by departure time,
-  // then computes ranking + comparison.
+  // Validates inputs, then issues TWO trip queries (forward + opposite direction) to
+  // build a window of journeys around the Selected_Time, merges and de-duplicates them,
+  // orders by departure time, then computes ranking + comparison. Applies mode exclusion
+  // to both queries. See "Earlier + Later Window" below.
   planRoutes(request: RouteRequest): Promise<RouteResult>;
 }
 
@@ -144,8 +151,24 @@ interface RouteRankingEngine {
 
 // TfNSW API Client + Normaliser (only component aware of EFA JSON)
 interface TfnswClient {
+  // Carries `modes` and `matchQuality` through the normaliser so the caller can
+  // apply the Location Prioritisation Algorithm.
   stopFinder(query: string): Promise<Location[]>;
-  trip(originId: string, destinationId: string, time: Date, mode: 'dep' | 'arr'): Promise<Journey[]>;
+
+  // Issues a single trip query. `depArr` selects depart-at vs arrive-by
+  // (depArrMacro=dep|arr). `calcNumberOfTrips` caps the number of trips the API
+  // returns for this query (default 6). `excludedModes` is the set of selectable
+  // modes to exclude: for each excluded mode the client emits exclMOT_<code>=1 and
+  // adds excludedMeans=checkbox. When `excludedModes` is empty, NO exclusion params
+  // are sent (all modes included).
+  trip(params: {
+    originId: string;
+    destinationId: string;
+    time: Date;                    // Selected_Time, converted to Sydney-local itdDate/itdTime
+    depArr: 'dep' | 'arr';
+    calcNumberOfTrips?: number;     // default 6
+    excludedModes?: SelectableMode[];
+  }): Promise<Journey[]>;
 }
 
 // Opal Fare Calculator (pure function over leg distance + mode)
@@ -160,12 +183,38 @@ interface OpalFareCalculator {
 
 > **Fare calculator scope (decision):** The first implementation is a **distance-band estimate** — each mode maps the leg `distance` (metres) to a distance band, and each band maps to a fare value, with rail treated approximately. **Transfer discounts and daily/weekly fare caps are explicitly deferred** as a future enhancement. The Opal fare tables (distance bands and fare values) are loaded as configuration/data, not hard-coded into logic, so they can be updated when Opal pricing changes.
 
+### Route Service — Earlier + Later Window (Req 2.2, 7.3–7.5)
+
+The TfNSW `trip` endpoint returns trips in one direction from the requested time: a depart-at query yields trips at/after the time, and an arrive-by query yields trips arriving at/before the time. To satisfy Req 2.2 — a result that includes trips from the `Selected_Time` onward **plus at least 5 earlier trips** — the Route Service issues **two** queries and merges them.
+
+**For a "Leave now" / "Leave at" search (`depArr = 'dep'`) at Selected_Time `T`:**
+1. **Forward set** — `trip(depArr='dep', time=T, calcNumberOfTrips≈6)` → trips departing at/after `T`.
+2. **Earlier set** — `trip(depArr='arr', time=T, calcNumberOfTrips≈6)` → trips arriving by `T`, which yields earlier *departures* than `T`.
+3. **Merge** the two journey lists, **de-duplicate**, and **order by non-decreasing `departureTime`**.
+
+**For an "Arrive by" search (`depArr = 'arr'`) at Selected_Time `T`:** mirror the strategy —
+1. **Primary set** — `trip(depArr='arr', time=T, calcNumberOfTrips≈6)` → trips arriving at/before `T`.
+2. **Later alternatives** — `trip(depArr='dep', time=T, calcNumberOfTrips≈6)` → trips departing at/after `T`, providing later options around `T`.
+3. **Merge**, **de-duplicate**, and **order by departure time**, keeping a window around `T`.
+
+**De-duplication signature:** because the trip API supplies no journey id, two journeys are considered the same when their **stable signature** matches — `(first leg origin stop, last leg destination stop, departureTime, arrivalTime)`. Duplicates that appear in both query results are collapsed to one entry.
+
+**Earlier-trip guarantee:** when the API offers them, the merged result includes **at least 5** trips departing before the forward set's first trip. If the opposite-direction query returns fewer, the service includes as many as are available (the guarantee is "at least 5 when the API offers them").
+
+**Mode exclusion applies to BOTH queries:** the excluded-modes set derived from `includedModes` is passed identically to the forward and earlier/later queries so the whole window respects the user's Mode_Selection.
+
 ### REST API Endpoints
 
 | Method | Path | Purpose | Auth |
 |---|---|---|---|
 | `GET` | `/api/locations?query={q}` | Location autocomplete (Req 1) | None (public, see Security) |
-| `GET` | `/api/routes?originId={o}&destinationId={d}&time={iso}` | Route discovery + ranking + comparison, with full leg-by-leg detail per journey (Req 2-5) | None (public, see Security) |
+| `GET` | `/api/routes?originId={o}&destinationId={d}&time={iso}&when={leaveNow\|leaveAt\|arriveBy}&modes={csv}` | Route discovery + ranking + comparison, with full leg-by-leg detail per journey (Req 2–7) | None (public, see Security) |
+
+**`/api/routes` query parameters (Req 6, 7):**
+- `when` — one of `leaveNow` \| `leaveAt` \| `arriveBy` (the Time_Filter). `leaveNow` and `leaveAt` map to `depArr='dep'`; `arriveBy` maps to `depArr='arr'`. Defaults to `leaveNow` when omitted.
+- `time` — ISO 8601 Selected_Time. Required for `leaveAt` / `arriveBy`; ignored (server uses current time) for `leaveNow`.
+- `modes` — comma-separated list of included selectable modes (codes or names, e.g. `train,bus,ferry` or `1,5,9`). Omitted or listing all modes ⇒ include everything (no exclusion).
+- **Validation (allowlist):** `when` must be one of the three allowed values; each entry in `modes` must be an allowlisted selectable mode (train, metro, lightRail, bus, coach, ferry, school); `time` must be a valid ISO 8601 timestamp. **Deselecting all modes** (an empty `modes` set explicitly signalling "none selected") is a `ValidationError` and the route search is not performed (Req 6.4). Note: an *omitted* `modes` param means "all included", which is distinct from "none selected".
 
 > **No journey-detail endpoint:** The TfNSW API has no journey id and no per-journey detail endpoint. The `/api/routes` response already contains complete leg-by-leg detail for every journey, so the detail view (Req 3.2, 4.2, 5.5) renders from the already-fetched data. The backend assigns a **synthetic** `id` to each journey (a hash/index of its content) purely so the client can select a journey from the result set.
 
@@ -182,6 +231,12 @@ interface Location {
   name: string;          // display name (full `name`, may include suburb)
   type: LocationType;    // mapped from EFA `type` (see EFA Response Mapping)
   suburb: string | null; // parent locality, where provided
+  modes: TransportMode[];// served public-transport modes, mapped from the stop_finder
+                         // `modes` integer codes (see EFA Response Mapping); empty when
+                         // the location serves no transit (e.g. address/POI/suburb).
+                         // Used both for result ordering (priority tier) and for display.
+  matchQuality: number;  // EFA `matchQuality` (higher = better); used to order results
+                         // within a priority tier. Defaults to 0 when absent.
   coord: {               // EFA `coord` is [latitude, longitude] (EPSG:4326)
     lat: number;
     lng: number;
@@ -234,12 +289,27 @@ interface Journey {
 interface RouteRequest {
   originId: string;
   destinationId: string;
-  time: string;               // ISO 8601 desired departure time
+  time: string;               // ISO 8601 Selected_Time (interpreted per `depArr` below)
+  depArr: 'dep' | 'arr';      // 'dep' = depart at/after `time` (Leave now / Leave at);
+                              // 'arr' = arrive at/before `time` (Arrive by).
+                              // "Leave now" is modelled as depArr='dep' with time = current time.
+  includedModes: TransportMode[]; // the priceable/transit modes to include in results.
+                              // An empty list OR a list containing all selectable modes means
+                              // "no exclusion" (include everything). Any strict, non-empty
+                              // subset causes the complement to be excluded upstream.
+                              // walk/bicycle are connectors and are never part of this set.
 }
+
+// The selectable public-transport modes a user can include/exclude (Requirement 6).
+// Order matches the Mode_Selection control. walk/bicycle/other are NOT selectable.
+type SelectableMode = 'train' | 'metro' | 'lightRail' | 'bus' | 'coach' | 'ferry' | 'school';
 
 // Result of route discovery + ranking.
 interface RouteResult {
-  journeys: Journey[];        // up to 5, ordered by departureTime
+  journeys: Journey[];        // the merged window: the forward set (from Selected_Time onward)
+                              // PLUS at least 5 earlier trips when the API offers them,
+                              // de-duplicated and ordered by non-decreasing departureTime.
+                              // No longer capped at 5.
   fastestId: string | null;
   economicalId: string | null;
   comparison: RouteComparison;
@@ -274,6 +344,23 @@ interface ComparisonEntry {
 - **Travel time definition**: `travelTimeMinutes` is the difference between the last leg's arrival and the first leg's departure (estimated where available, else planned), inherently including transfer waiting time (Req 3.3).
 - **Transfer count**: number of vehicle changes, derived from the count of non-walk vehicle legs minus one (floored at zero), matching the user-facing "number of transfers".
 - **Fare aggregation**: `totalFare` is the sum of per-leg estimated fares. If any fare-bearing (priced) leg cannot be priced, `totalFare` is `null` and the journey is excluded from economical ranking (Req 4.4).
+- **Location modes drive ordering and display**: `Location.modes` (mapped from the stop_finder `modes` integer codes) determines a location's priority tier for `Search_Results` ordering (Req 1.3) and is surfaced in the UI alongside `type`. `Location.matchQuality` orders results within a tier (Req 1.4).
+- **Merged journey window**: `RouteResult.journeys` is no longer capped at 5. It is the de-duplicated union of a forward set (trips at/after the `Selected_Time`) and an earlier set (at least 5 prior trips when available), ordered by non-decreasing `departureTime`. See the Route Service two-query strategy below.
+- **Mode inclusion semantics**: `RouteRequest.includedModes` lists the modes to include. The Route Service converts it to the complement set of modes to exclude before calling the client (empty or all-modes ⇒ exclude nothing). Deselecting every mode is a `ValidationError` and never reaches the client.
+
+### Location Prioritisation Algorithm (normaliser)
+
+The normaliser orders `Search_Results` so the most relevant transit locations appear first (Req 1.3, 1.4). The algorithm is a pure function over the normalised locations:
+
+1. **Assign a priority tier** to each `Location` from its `type` and served `modes`:
+   - **Tier 1** — train or metro stations (`modes` includes `train` or `metro`; `type` station/stop/platform).
+   - **Tier 2** — ferry wharves (`modes` includes `ferry`).
+   - **Tier 3** — bus stops (`modes` includes `bus`).
+   - **Tier 4** — other public-transport stops, including light rail, coach, and school bus (`modes` includes any of `lightRail` / `coach` / `school` but none of the higher tiers).
+   - **Tier 5** — non-transit locations: addresses, points of interest, and suburbs (`type` ∈ {`address`, `poi`, `suburb`} or empty `modes`).
+   - When a location serves modes spanning multiple tiers, it takes the **lowest (best) tier number** among them (e.g. an interchange serving both train and bus is Tier 1).
+2. **Sort** the full list by `(tier ascending, matchQuality descending)`. The sort is stable, so equal `(tier, matchQuality)` entries retain their upstream order.
+3. **Cap** the sorted list at the first **10** entries.
 
 ### EFA Response Mapping
 
@@ -288,7 +375,8 @@ The normaliser is the only component aware of the raw EFA JSON. Verified mapping
   - `locality` / `suburb` → `suburb`
   - **`unknown` → dropped** (the schema states these indicate bad data and can be safely ignored).
 - `parent` (`ParentLocation`) supplies the suburb/locality where present → `Location.suburb`.
-- `matchQuality` (higher = better) is used to **sort** results; `isBest` flags the best match; `modes[]` are integer mode codes.
+- `matchQuality` (higher = better) → `Location.matchQuality` (defaulting to 0 when absent); used to **sort** results within a priority tier. `isBest` flags the best match.
+- `modes[]` are integer mode codes → mapped to `Location.modes` (a deduplicated `TransportMode[]`) using the same `class` → mode table as legs (see Transport mode table below: 1 train, 2 metro, 4 light rail, 5 bus, 7 coach, 9 ferry, 11 school bus). Previously dropped; now carried through the normaliser to drive ordering and display.
 
 **Journey fields:**
 - A journey has only `legs`, `rating`, and `isAdditional` — **there is no journey id field**. `Journey.id` is backend-assigned (synthetic).
@@ -321,14 +409,15 @@ Walk (`99`/`100`) and bicycle (`101`) legs are treated as transfers/connectors a
 
 All requests use base URL `https://api.transport.nsw.gov.au/v1/tp/`, header `Authorization: apikey <key>`, and common params `outputFormat=rapidJSON`, `coordOutputFormat=EPSG:4326`.
 
-- **`stop_finder`**: `type_sf=any`, `name_sf=<query>`, `TfNSWSF=true`, `anyMaxSizeHitList`, `odvSugMacro=1`.
-- **`trip`**: `type_origin=stop`, `name_origin=<id>`, `type_destination=stop`, `name_destination=<id>`, `depArrMacro=dep|arr`, `itdDate=YYYYMMDD`, `itdTime=HHMM`, `TfNSWTR=true`. The `itdDate`/`itdTime` values are **Sydney local** time for the request.
+- **`stop_finder`**: `type_sf=any`, `name_sf=<query>`, `TfNSWSF=true`, `anyMaxSizeHitList`, `odvSugMacro=1`. The normaliser retains each location's `modes` and `matchQuality` (previously dropped) so the Location Service can order results by priority tier and match quality.
+- **`trip`**: `type_origin=stop`, `name_origin=<id>`, `type_destination=stop`, `name_destination=<id>`, `depArrMacro=dep|arr`, `itdDate=YYYYMMDD`, `itdTime=HHMM`, `calcNumberOfTrips=<int>` (max trips per query, default 6), `TfNSWTR=true`. The `itdDate`/`itdTime` values are **Sydney local** time for the request.
+  - **Mode exclusion**: to restrict results to a chosen set of modes, the client excludes the complement. For each excluded mode it sends `exclMOT_<code>=1` and additionally sends `excludedMeans=checkbox`. Mode codes: `1` train, `2` metro, `4` light rail, `5` bus, `7` coach, `9` ferry, `11` school bus. When all modes are included, **no** `excludedMeans`/`exclMOT_*` params are sent.
 
 ## Correctness Properties
 
 *A property is a characteristic or behavior that should hold true across all valid executions of a system — essentially, a formal statement about what the system should do. Properties serve as the bridge between human-readable specifications and machine-verifiable correctness guarantees.*
 
-The route-ranking engine, fare aggregation, comparison math, formatting helpers, and EFA normaliser are all pure functions over data, making them excellent candidates for property-based testing. The properties below are derived from the prework analysis. UI interactions, empty-state messaging, and upstream error handling are validated by example-based and edge-case tests (see Testing Strategy) rather than properties.
+The route-ranking engine, fare aggregation, comparison math, formatting helpers, the EFA normaliser, the location prioritisation ordering, the journey-window merge, and the mode-exclusion parameter mapping are all pure functions over data, making them excellent candidates for property-based testing. The properties below are derived from the prework analysis. UI interactions (Time Filter / Mode Selection controls), empty-state messaging, the all-modes-deselected validation, and upstream error handling are validated by example-based and edge-case tests (see Testing Strategy) rather than properties.
 
 > **Fare calculator note:** The Opal Fare Calculator's distance-band mapping (which band a given distance falls into, and the fare value for that band) is validated by **example-based tests** that pin the exact band boundaries per mode, rather than by a universal property. The fare *aggregation* logic that consumes calculator output (Property 8) and the economical-selection logic (Property 9) remain property-based, since they operate on the domain model independent of how individual fares were derived.
 
@@ -350,11 +439,11 @@ The route-ranking engine, fare aggregation, comparison math, formatting helpers,
 
 **Validates: Requirements 1.6**
 
-### Property 4: Journeys are capped at 5 and ordered by departure
+### Property 4: Journey window is ordered, de-duplicated, and includes earlier trips
 
-*For any* set of upstream journeys, the normalised journey list returned by `planRoutes` has length at most 5 and is ordered by non-decreasing `departureTime`.
+*For any* forward set of journeys (at/after the Selected_Time) and any earlier/opposite-direction set produced by the two-query strategy, the merged `RouteResult.journeys` is ordered by non-decreasing `departureTime`, contains no two journeys with the same stable signature `(first origin stop, last destination stop, departureTime, arrivalTime)`, and — whenever the earlier set offers at least 5 journeys departing before the forward set's first trip — includes at least 5 such earlier trips.
 
-**Validates: Requirements 2.2**
+**Validates: Requirements 2.2, 7.3, 7.4, 7.5**
 
 ### Property 5: Travel time equals arrival minus departure including transfer waits
 
@@ -416,6 +505,18 @@ The route-ranking engine, fare aggregation, comparison math, formatting helpers,
 
 **Validates: Requirements 1.2, 2.3**
 
+### Property 15: Location prioritisation orders by tier then match quality
+
+*For any* set of locations, the normalised, prioritised order produced by the Location Service is non-decreasing by priority tier (tier 1 train/metro stations, tier 2 ferry, tier 3 bus, tier 4 other transit incl. light rail/coach/school, tier 5 address/POI/suburb), and for any two results sharing the same tier the earlier one has a `matchQuality` greater than or equal to the later one.
+
+**Validates: Requirements 1.3, 1.4**
+
+### Property 16: Mode-exclusion mapping emits the complement of included modes
+
+*For any* non-empty subset S of the seven selectable Transport_Modes chosen for inclusion, the `TfnswClient.trip` request emits an `exclMOT_<code>=1` flag for exactly the modes in the complement of S (and none for modes in S); and when S is empty or equals the full set of selectable modes, the request emits no `excludedMeans`/`exclMOT_*` exclusion parameters at all.
+
+**Validates: Requirements 6.2, 6.3**
+
 ## Error Handling
 
 The system distinguishes recoverable user-facing conditions from upstream failures, and maps each to a clear client response.
@@ -426,6 +527,7 @@ The system distinguishes recoverable user-facing conditions from upstream failur
 | No matching locations | Empty normalised list | "No locations found for the given query" | 1.4 |
 | TfNSW unreachable / error (search) | HTTP error / timeout from client | "Service temporarily unavailable"; typed text retained | 1.5 |
 | Origin == destination | Backend validation before API call | Validation message; search prevented | 2.5 |
+| All Transport_Modes deselected | Frontend guard + backend validation (empty included-modes set) | "At least one Transport_Mode is required"; search prevented, no API call | 6.4 |
 | No routes available | Empty normalised journeys | "No routes found" + suggest changing origin/destination/time | 2.4 |
 | TfNSW unreachable / error (route) | HTTP error / timeout from client | "Service temporarily unavailable"; selections retained | 2.6 |
 | Route/journey detail retrieval fails | HTTP error / timeout on the `/api/routes` request (detail is part of this response, not fetched separately) | "Journey details could not be loaded" + retry action | 3.4 |
@@ -443,7 +545,7 @@ The system distinguishes recoverable user-facing conditions from upstream failur
 Caching reduces latency, smooths the TfNSW rate limit, and improves the experience for both web and the future Android client.
 
 - **Stop Finder responses**: cached keyed by normalised (lowercased, trimmed) query string. Location data changes infrequently, so a TTL of ~24 hours is appropriate.
-- **Trip responses**: cached keyed by `(originId, destinationId, time-bucket)` with a short TTL (~60 seconds), because schedules and the implicit "now" change quickly. Requests without an explicit time round the time to a small bucket to improve hit rate while staying current.
+- **Trip responses**: cached keyed by `(originId, destinationId, depArr, includedModesSignature, time-bucket)` with a short TTL (~60 seconds), because schedules and the implicit "now" change quickly. The `includedModesSignature` is a canonical (sorted) representation of the included-modes set so different mode selections do not collide, and `depArr` distinguishes depart-at from arrive-by windows. Requests without an explicit time round the time to a small bucket to improve hit rate while staying current.
 - **Cache placement**: in the backend service layer (in-memory LRU for a single instance; a shared cache such as Redis if horizontally scaled). Clients receive `Cache-Control` headers so the SPA may also do brief client-side caching of autocomplete results.
 - **Invalidation**: TTL-based expiry only; no manual invalidation needed for read-only proxied data.
 
@@ -468,7 +570,7 @@ A dual approach combines property-based tests for universal logic with example/e
 - **Iterations**: each property test runs a minimum of **100 iterations**.
 - **Traceability**: each property test is tagged with a comment referencing its design property, in the format:
   `Feature: tfnsw-route-planner, Property {number}: {property_text}`
-- **Coverage**: Properties 1–14 above are each implemented by a single property-based test. Generators produce randomised journeys (varying leg counts, modes, times, transfer counts, and fares including missing-fare cases), location lists (varying sizes including > 10), and query strings (including whitespace-only and sub-3-character inputs).
+- **Coverage**: Properties 1–16 above are each implemented by a single property-based test. Generators produce randomised journeys (varying leg counts, modes, times, transfer counts, and fares including missing-fare cases), forward/earlier journey-set pairs with overlapping signatures (for the merge window, Property 4), location lists (varying sizes including > 10, with varied types and served modes including multi-mode and non-transit, for prioritisation Property 15), included-mode subsets over the seven selectable modes (for the exclusion mapping, Property 16), and query strings (including whitespace-only and sub-3-character inputs).
 - **Edge cases via generators**: empty/whitespace queries, journeys with a single leg, walk-only journeys with no fare, ties on travel time and on fare, large result sets (to exercise the caps), and non-ASCII location names are produced by the generators so the relevant properties cover them.
 
 ### Example-Based Unit Tests
@@ -481,12 +583,16 @@ Focused tests for behaviors that are not universal:
 - Detail views render leg info including platform when present (Req 3.2, 4.2, 5.5).
 - Opal Fare Calculator distance-band boundaries: each mode's exact band boundaries map to the correct fare value (e.g. a distance just below vs just above a band edge yields the adjacent fares), and walk/bicycle legs return null (Req 4.3).
 - Comparison view renders both entries side by side (Req 5.1).
+- Mode Selection control defaults to all seven modes selected (Req 6.1, 6.2).
+- Time Filter control offers the three options and defaults to "Leave now" (Req 7.1, 7.2).
+- Time filter to query mapping: "Leave now" / "Leave at" map to `depArr='dep'`, "Arrive by" maps to `depArr='arr'` (Req 7.3, 7.4, 7.5).
 
 ### Edge-Case / Error Tests
 
 - Upstream failure during search surfaces `ServiceUnavailableError` and the SPA retains typed text (Req 1.5).
 - Upstream failure during route search retains selections (Req 2.6).
 - Journey detail fetch failure shows the error and exposes a retry action (Req 3.4). Since detail is part of the `/api/routes` response, this is exercised by failing that request.
+- Deselecting all Transport_Modes raises a `ValidationError`, shows the "at least one Transport_Mode is required" message, and performs no upstream trip query (Req 6.4).
 
 ### Integration Tests
 
@@ -497,4 +603,4 @@ A small number (1–3 examples) verifying the real wiring, not run at scale:
 
 ### Frontend / Responsive Tests
 
-- Snapshot and responsive-layout tests confirm mobile-first breakpoints render correctly across phone and desktop widths. (UI rendering is validated by snapshot/example tests rather than property-based tests.)
+- Snapshot and responsive-layout tests confirm mobile-first breakpoints render correctly across phone and desktop widths, including the Time Filter and Mode Selection controls. (UI rendering is validated by snapshot/example tests rather than property-based tests.)

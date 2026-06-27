@@ -160,7 +160,12 @@ async function main(): Promise<number> {
   console.log(
     `\n③ Trip — ${origin.name} (${origin.id}) → ${destination.name} (${destination.id})`,
   );
-  const journeys = await client.trip(origin.id, destination.id, new Date(), 'dep');
+  const journeys = await client.trip({
+    originId: origin.id,
+    destinationId: destination.id,
+    time: new Date(),
+    depArr: 'dep',
+  });
   if (journeys.length === 0) {
     console.error('✗ No journeys returned for the trip.');
     return 1;

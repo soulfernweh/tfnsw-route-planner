@@ -30,7 +30,16 @@ import { LocationSearchField } from './components/LocationSearchField';
 import { RouteSearchController } from './components/RouteSearchController';
 import { RouteComparisonView } from './components/RouteComparisonView';
 import { JourneyDetailView } from './components/JourneyDetailView';
-import type { Journey, Location, RouteResult } from './api/types';
+import { TimeFilterControl } from './components/TimeFilterControl';
+import type { TimeFilterValue } from './components/TimeFilterControl';
+import { ModeSelectionControl } from './components/ModeSelectionControl';
+import { ALL_SELECTABLE_MODES } from './api/client';
+import type {
+  Journey,
+  Location,
+  RouteResult,
+  SelectableMode,
+} from './api/types';
 import './styles/app.css';
 
 /** Stable field identifiers shared by the origin/destination search fields. */
@@ -46,6 +55,18 @@ export function App(): JSX.Element {
   // The latest successful route result (or null while idle/loading/error),
   // surfaced by the RouteSearchController.
   const [result, setResult] = useState<RouteResult | null>(null);
+
+  // The Time_Filter state (Req 7). Defaults to "Leave now" with no explicit
+  // time, mirroring the TimeFilterControl's initial state.
+  const [timeFilter, setTimeFilter] = useState<TimeFilterValue>({
+    when: 'leaveNow',
+  });
+
+  // The selected transport modes (Req 6). All seven are selected by default,
+  // matching the ModeSelectionControl's initial state.
+  const [includedModes, setIncludedModes] = useState<SelectableMode[]>(() => [
+    ...ALL_SELECTABLE_MODES,
+  ]);
 
   // The route the user has chosen to inspect in detail (from the list or the
   // comparison view).
@@ -82,6 +103,14 @@ export function App(): JSX.Element {
   // Re-trigger the route search (wired to the detail view's retry, Req 3.4).
   const handleRetry = useCallback((): void => {
     setRetrySignal((signal) => signal + 1);
+  }, []);
+
+  const handleTimeFilterChange = useCallback((next: TimeFilterValue): void => {
+    setTimeFilter(next);
+  }, []);
+
+  const handleModesChange = useCallback((next: SelectableMode[]): void => {
+    setIncludedModes(next);
   }, []);
 
   const hasRoutes = result !== null && result.journeys.length > 0;
@@ -129,9 +158,17 @@ export function App(): JSX.Element {
               />
             </div>
 
+            <div className="app-search-filters">
+              <TimeFilterControl onChange={handleTimeFilterChange} />
+              <ModeSelectionControl onChange={handleModesChange} />
+            </div>
+
             <RouteSearchController
               origin={origin}
               destination={destination}
+              when={timeFilter.when}
+              {...(timeFilter.time !== undefined ? { time: timeFilter.time } : {})}
+              includedModes={includedModes}
               onSelectJourney={handleSelectJourney}
               onResult={handleResult}
               retrySignal={retrySignal}

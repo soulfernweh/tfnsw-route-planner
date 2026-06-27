@@ -1,9 +1,13 @@
-// RouteList — renders up to 5 discovered routes for a search (Req 2.2, 2.3).
+// RouteList — renders the merged journey window for a search (Req 2.2, 2.3).
 //
 // Each route shows its departure time, arrival time, total travel time, number
 // of transfers, and the transport modes used. The fastest and the most
 // economical routes are visually badged/highlighted using the `fastestId` and
 // `economicalId` carried on the RouteResult (Req 3.1, 4.1).
+//
+// The backend now returns a merged window (the forward set plus earlier trips),
+// ordered by departure time and no longer capped at 5; this component renders
+// every journey in that window.
 //
 // Mobile-first: routes stack as full-width cards on phones and flow naturally
 // on larger screens via the shared route styles.
@@ -17,9 +21,6 @@ import {
 } from './routeFormat';
 import '../styles/routes.css';
 
-/** The maximum number of routes the design surfaces for a single search. */
-const MAX_ROUTES = 5;
-
 export interface RouteListProps {
   /** Discovered journeys (already ranked/ordered by the backend). */
   journeys: Journey[];
@@ -31,14 +32,12 @@ export interface RouteListProps {
   onSelect?: (journey: Journey) => void;
 }
 
-/** Orders journeys by non-decreasing departure time and caps at 5. */
-function orderedTopRoutes(journeys: Journey[]): Journey[] {
-  return [...journeys]
-    .sort(
-      (a, b) =>
-        new Date(a.departureTime).getTime() - new Date(b.departureTime).getTime(),
-    )
-    .slice(0, MAX_ROUTES);
+/** Orders the full window of journeys by non-decreasing departure time. */
+function orderedRoutes(journeys: Journey[]): Journey[] {
+  return [...journeys].sort(
+    (a, b) =>
+      new Date(a.departureTime).getTime() - new Date(b.departureTime).getTime(),
+  );
 }
 
 /** Renders the ordered, comma-free list of transport modes for a journey. */
@@ -176,7 +175,7 @@ export function RouteList({
   economicalId,
   onSelect,
 }: RouteListProps): JSX.Element | null {
-  const routes = orderedTopRoutes(journeys);
+  const routes = orderedRoutes(journeys);
   if (routes.length === 0) {
     return null;
   }

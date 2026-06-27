@@ -15,6 +15,7 @@ export type {
   RouteResult,
   RouteComparison,
   ComparisonEntry,
+  SelectableMode,
   LocationService,
   RouteRankingEngine,
 } from './domain/models.js';

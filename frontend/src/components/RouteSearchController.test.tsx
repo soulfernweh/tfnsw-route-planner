@@ -21,8 +21,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom';
 
 import type { ApiClient } from '../api/client';
-import type { Location, RouteResult } from '../api/types';
+import type { Location, RouteResult, SelectableMode } from '../api/types';
 import { RouteSearchController } from './RouteSearchController';
+import { NO_MODES_MESSAGE } from './ModeSelectionControl';
 
 afterEach(() => {
   cleanup();
@@ -35,6 +36,8 @@ function makeLocation(overrides: Partial<Location> = {}): Location {
     name: 'Central Station',
     type: 'station',
     suburb: 'Sydney',
+    modes: ['train'],
+    matchQuality: 1000,
     coord: { lat: -33.8832, lng: 151.2069 },
     ...overrides,
   };
@@ -175,5 +178,57 @@ describe('RouteSearchController empty route result (Req 2.4)', () => {
 
     // The backend was queried exactly once for the valid pair.
     expect(planRoutes).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('RouteSearchController mode-selection validation (Req 6.4)', () => {
+  it('blocks the search and shows the no-modes message when zero modes are included', () => {
+    const { client, planRoutes } = makeFakeClient(async () => EMPTY_RESULT);
+    const noModes: SelectableMode[] = [];
+    render(
+      <RouteSearchController
+        origin={makeLocation({ id: 'origin', name: 'Town Hall' })}
+        destination={makeLocation({ id: 'destination', name: 'Bondi Junction' })}
+        includedModes={noModes}
+        client={client}
+      />,
+    );
+
+    // The no-modes validation message is surfaced to the user.
+    expect(screen.getByText(NO_MODES_MESSAGE)).toBeInTheDocument();
+
+    // The search action is disabled even though a valid origin/destination
+    // pair is selected, so the search is prevented...
+    const button = findRoutesButton();
+    expect(button).toBeDisabled();
+
+    // ...and attempting to activate it never reaches the backend.
+    fireEvent.click(button);
+    expect(planRoutes).not.toHaveBeenCalled();
+  });
+
+  it('enables the search and forwards the selected modes when a non-empty subset is included', async () => {
+    const { client, planRoutes } = makeFakeClient(async () => EMPTY_RESULT);
+    const someModes: SelectableMode[] = ['train', 'bus'];
+    render(
+      <RouteSearchController
+        origin={makeLocation({ id: 'origin', name: 'Town Hall' })}
+        destination={makeLocation({ id: 'destination', name: 'Bondi Junction' })}
+        includedModes={someModes}
+        client={client}
+      />,
+    );
+
+    const button = findRoutesButton();
+    expect(button).toBeEnabled();
+
+    fireEvent.click(button);
+
+    await screen.findByText(/no routes found/i);
+    expect(planRoutes).toHaveBeenCalledTimes(1);
+    expect(planRoutes).toHaveBeenCalledWith(
+      expect.objectContaining({ modes: someModes }),
+      expect.anything(),
+    );
   });
 });

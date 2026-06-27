@@ -1,0 +1,53 @@
+/* ModeSelectionControl styles.
+ *
+ * Mobile-first: checkboxes flow into a wrapping grid of comfortably tappable
+ * pills. Uses the shared design tokens.
+ */
+
+.mode-selection__fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.mode-selection__legend {
+  padding: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.mode-selection__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+
+.mode-selection__option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 0.5rem var(--space-sm);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.mode-selection__option:focus-within {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+  border-color: var(--color-primary);
+}
+
+.mode-selection__checkbox {
+  margin: 0;
+}
+
+.mode-selection__hint {
+  margin: var(--space-xs) 0 0;
+  font-size: 0.8125rem;
+  color: #b3261e;
+}

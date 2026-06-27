@@ -62,7 +62,18 @@ vi.mock('./api/client', () => {
     searchLocations: searchLocationsMock,
     planRoutes: planRoutesMock,
   };
-  return { ApiClient, ApiError, apiClient };
+  // App imports the canonical selectable-mode list from this module to seed its
+  // default mode selection, so the mock must re-export it.
+  const ALL_SELECTABLE_MODES = [
+    'train',
+    'metro',
+    'lightRail',
+    'bus',
+    'coach',
+    'ferry',
+    'school',
+  ] as const;
+  return { ApiClient, ApiError, apiClient, ALL_SELECTABLE_MODES };
 });
 
 // App must be imported AFTER vi.mock so its component tree binds to the mock.
@@ -75,6 +86,8 @@ const TOWN_HALL: Location = {
   name: 'Town Hall Station',
   type: 'station',
   suburb: 'Sydney',
+  modes: ['train'],
+  matchQuality: 950,
   coord: { lat: -33.873, lng: 151.207 },
 };
 
@@ -83,6 +96,8 @@ const WYNYARD: Location = {
   name: 'Wynyard Station',
   type: 'station',
   suburb: 'Sydney',
+  modes: ['train'],
+  matchQuality: 900,
   coord: { lat: -33.866, lng: 151.206 },
 };
 
@@ -91,6 +106,8 @@ const CENTRAL: Location = {
   name: 'Central Station',
   type: 'station',
   suburb: 'Haymarket',
+  modes: ['train', 'metro'],
+  matchQuality: 1000,
   coord: { lat: -33.883, lng: 151.206 },
 };
 
@@ -99,6 +116,8 @@ const REDFERN: Location = {
   name: 'Redfern Station',
   type: 'station',
   suburb: 'Redfern',
+  modes: ['train'],
+  matchQuality: 880,
   coord: { lat: -33.892, lng: 151.198 },
 };
 

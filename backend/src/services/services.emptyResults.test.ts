@@ -4,6 +4,7 @@ import type {
   Journey,
   Location,
   RouteRequest,
+  SelectableMode,
 } from '../domain/models.js';
 import {
   DefaultLocationService,
@@ -52,16 +53,20 @@ class EmptyTripClient implements RoutePlanningClient {
     originId: string;
     destinationId: string;
     time: Date;
-    mode: 'dep' | 'arr';
+    depArr: 'dep' | 'arr';
+    calcNumberOfTrips?: number;
+    excludedModes?: SelectableMode[];
   }> = [];
 
-  public trip(
-    originId: string,
-    destinationId: string,
-    time: Date,
-    mode: 'dep' | 'arr',
-  ): Promise<Journey[]> {
-    this.calls.push({ originId, destinationId, time, mode });
+  public trip(params: {
+    originId: string;
+    destinationId: string;
+    time: Date;
+    depArr: 'dep' | 'arr';
+    calcNumberOfTrips?: number;
+    excludedModes?: SelectableMode[];
+  }): Promise<Journey[]> {
+    this.calls.push(params);
     return Promise.resolve([]);
   }
 }
@@ -100,6 +105,17 @@ describe('RouteService.planRoutes - empty journey list (Req 2.4)', () => {
       originId: 'STOP_A',
       destinationId: 'STOP_B',
       time: '2025-01-15T08:00:00+11:00',
+      depArr: 'dep',
+      // All seven selectable modes => "no exclusion" (include everything).
+      includedModes: [
+        'train',
+        'metro',
+        'lightRail',
+        'bus',
+        'coach',
+        'ferry',
+        'school',
+      ],
     };
 
     const result = await service.planRoutes(request);
@@ -120,9 +136,14 @@ describe('RouteService.planRoutes - empty journey list (Req 2.4)', () => {
     expect(result.comparison.fareUnavailableForFastest).toBe(false);
 
     // The request was valid (distinct origin/destination), so the upstream trip
-    // client WAS invoked exactly once.
-    expect(client.calls).toHaveLength(1);
+    // client WAS invoked. RouteService now issues TWO queries (forward +
+    // opposite direction) to build the earlier+later window, so the client is
+    // called twice.
+    expect(client.calls).toHaveLength(2);
     expect(client.calls[0]?.originId).toBe('STOP_A');
     expect(client.calls[0]?.destinationId).toBe('STOP_B');
+    // The two queries cover both directions around the Selected_Time.
+    const depArrValues = client.calls.map((c) => c.depArr).sort();
+    expect(depArrValues).toEqual(['arr', 'dep']);
   });
 });

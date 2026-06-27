@@ -15,10 +15,11 @@
 //      an in-memory TTL+LRU cache, keyed by the normalised (lowercased,
 //      trimmed) query via `stopFinderCacheKey`, with the ~24h
 //      `STOP_FINDER_TTL_MS` TTL. A cache hit avoids the upstream call.
-//   3. UPSTREAM CALL + CAP (Req 1.1) — on a miss, call the injected client's
-//      `stopFinder`, store the result in the cache, and return at most 10
-//      locations. An empty list is a valid result (drives "no locations
-//      found", Req 1.4).
+//   3. UPSTREAM CALL + PRIORITISATION (Req 1.1, 1.3, 1.4) — on a miss, call
+//      the injected client's `stopFinder`, order the results by priority tier
+//      then match quality and cap at 10 via `prioritiseLocations`, store that
+//      in the cache, and return it. An empty list is a valid result (drives
+//      "no locations found", Req 1.4).
 //   4. ERROR PROPAGATION (Req 1.5) — upstream failures surface as
 //      `ServiceUnavailableError` from the client; this service does NOT
 //      swallow them. They propagate to the caller unchanged.
@@ -32,6 +33,7 @@
 // Requirements: 1.1, 1.4, 1.6.
 
 import type { Location, LocationService } from '../domain/models.js';
+import { prioritiseLocations } from '../tfnsw/normalise.js';
 import {
   STOP_FINDER_TTL_MS,
   TtlLruCache,
@@ -56,9 +58,6 @@ export const MIN_QUERY_LENGTH = 3;
  * entries gives a good hit rate without unbounded growth.
  */
 const DEFAULT_CACHE_MAX_SIZE = 500;
-
-/** Maximum number of locations returned to clients (Req 1.1). */
-const MAX_RESULTS = 10;
 
 /**
  * Location autocomplete service backed by the TfNSW stop finder and an
@@ -109,10 +108,11 @@ export class DefaultLocationService implements LocationService {
     // propagates to the caller (Req 1.5) — deliberately not caught here.
     const locations = await this.client.stopFinder(query);
 
-    // Cap defensively at 10 (Req 1.1); cache the capped result so subsequent
-    // hits are consistent with what callers receive.
-    const capped = locations.slice(0, MAX_RESULTS);
-    this.cache.set(key, capped, STOP_FINDER_TTL_MS);
-    return capped;
+    // Order by priority tier then match quality and cap at 10 (Req 1.1, 1.3,
+    // 1.4) via the normaliser's prioritisation algorithm; cache the prioritised
+    // result so subsequent hits are consistent with what callers receive.
+    const prioritised = prioritiseLocations(locations);
+    this.cache.set(key, prioritised, STOP_FINDER_TTL_MS);
+    return prioritised;
   }
 }

@@ -64,6 +64,7 @@ const MODE_LABELS: Record<TransportMode, string> = {
   lightRail: 'Light Rail',
   coach: 'Coach',
   walk: 'Walk',
+  bicycle: 'Bicycle',
   school: 'School Bus',
   other: 'Other',
 };

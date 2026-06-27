@@ -1,0 +1,82 @@
+/* TimeFilterControl styles.
+ *
+ * Mobile-first: options wrap onto multiple rows on narrow screens and the
+ * datetime input fills the available width. Uses the shared design tokens.
+ */
+
+.time-filter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.time-filter__fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.time-filter__legend {
+  padding: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.time-filter__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+
+.time-filter__option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 0.5rem var(--space-sm);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.time-filter__option:focus-within {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+  border-color: var(--color-primary);
+}
+
+.time-filter__radio {
+  margin: 0;
+}
+
+.time-filter__time {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.time-filter__time-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.time-filter__time-input {
+  width: 100%;
+  padding: 0.625rem var(--space-sm);
+  font-size: 1rem; /* >= 16px avoids iOS zoom-on-focus */
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  line-height: 1.4;
+}
+
+.time-filter__time-input:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+  border-color: var(--color-primary);
+}

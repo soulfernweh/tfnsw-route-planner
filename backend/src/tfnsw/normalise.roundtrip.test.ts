@@ -111,11 +111,41 @@ const LOCATION_TYPE_ARB: fc.Arbitrary<LocationType> = fc.constantFrom<LocationTy
   'suburb',
 );
 
+/**
+ * The public-transport modes a stop_finder entry can serve, paired with the EFA
+ * `modes` integer `class` codes the normaliser maps them from (mirrors
+ * STOP_FINDER_MODE_MAP in normalise.ts). Restricted to this invertible subset so
+ * each generated mode encodes to a code that maps back to the same mode.
+ */
+const STOP_MODE_TO_CLASS: Readonly<Partial<Record<TransportMode, number>>> = {
+  train: 1,
+  metro: 2,
+  lightRail: 4,
+  bus: 5,
+  coach: 7,
+  ferry: 9,
+  school: 11,
+};
+
+const STOP_MODES: TransportMode[] = Object.keys(STOP_MODE_TO_CLASS) as TransportMode[];
+
+/**
+ * A subset of served modes, in their canonical order. `fc.subarray` preserves
+ * the source order and emits no duplicates, matching the normaliser's
+ * first-seen, de-duplicated `extractModes` behaviour.
+ */
+const MODES_ARB: fc.Arbitrary<TransportMode[]> = fc.subarray(STOP_MODES);
+
+/** A finite, non-negative match quality (higher = better). Defaults to 0 when absent. */
+const MATCH_QUALITY_ARB: fc.Arbitrary<number> = fc.nat({ max: 1_000_000 });
+
 const LOCATION_ARB: fc.Arbitrary<Location> = fc.record({
   id: ID_ARB,
   name: NAME_ARB,
   type: LOCATION_TYPE_ARB,
   suburb: SUBURB_ARB,
+  modes: MODES_ARB,
+  matchQuality: MATCH_QUALITY_ARB,
   coord: fc.option(COORD_ARB, { nil: null }),
 });
 
@@ -123,13 +153,16 @@ const LOCATION_ARB: fc.Arbitrary<Location> = fc.record({
  * Encode a domain `Location` into an EFA stop-finder entry, using the verified
  * field mappings: `coord` as `[lat, lng]`, the type token equal to the
  * normalised type (each LocationType has an identity token in the EFA type
- * map), and the suburb supplied via a `parent` locality.
+ * map), the suburb supplied via a `parent` locality, the served `modes` as their
+ * EFA integer `class` codes, and `matchQuality` as-is.
  */
 function encodeLocation(loc: Location): Record<string, unknown> {
   const entry: Record<string, unknown> = {
     id: loc.id,
     name: loc.name,
     type: loc.type,
+    modes: loc.modes.map((mode) => STOP_MODE_TO_CLASS[mode]),
+    matchQuality: loc.matchQuality,
   };
   if (loc.suburb !== null) {
     entry['parent'] = { name: loc.suburb, type: 'suburb' };
@@ -162,6 +195,8 @@ describe('EFA normalisation round-trip: Location (Property 14)', () => {
       name: 'Central Station',
       type: 'station',
       suburb: 'Haymarket',
+      modes: ['train', 'bus'],
+      matchQuality: 950,
       coord: { lat: -33.883, lng: 151.206 },
     };
     const result = normaliseLocations({ locations: [encodeLocation(loc)] });

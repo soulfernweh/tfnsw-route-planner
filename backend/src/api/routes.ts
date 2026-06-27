@@ -14,8 +14,14 @@
 //
 // Endpoints (design "REST API Endpoints"):
 //   - GET /api/locations?query=            → Location[]   (Req 1.1)
-//   - GET /api/routes?originId=&destinationId=&time=
+//   - GET /api/routes?originId=&destinationId=&time=&when=&modes=
 //                                          → RouteResult  (Req 2.2, 3.2, 4.2, 5.5)
+//
+// The `/api/routes` endpoint additionally accepts the optional `when`
+// (Time_Filter: leaveNow | leaveAt | arriveBy, default leaveNow) and `modes`
+// (Mode_Selection: a comma-separated list of selectable mode names or numeric
+// class codes) query params; see `validateRouteParams` for their semantics
+// (Req 6, 7).
 //
 // There is intentionally NO journey-detail-by-id endpoint: the TfNSW trip API
 // has no journey id, and `/api/routes` already returns full leg-by-leg detail
@@ -218,7 +224,7 @@ async function handleLocations(
   }
 }
 
-/** `GET /api/routes?originId=&destinationId=&time=` → validated → `RouteResult`. */
+/** `GET /api/routes?originId=&destinationId=&time=&when=&modes=` → validated → `RouteResult`. */
 async function handleRoutes(
   params: URLSearchParams,
   deps: RouteHandlerDeps,

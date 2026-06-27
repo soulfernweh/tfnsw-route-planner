@@ -8,8 +8,11 @@
 //   TfnswClient, "Data Models", "Security" → Untrusted upstream data).
 //
 // Requirements covered by this file:
-//   - 1.1: location results are capped at 10
-//   - 1.2: each normalised Location has a non-empty name and a valid LocationType
+//   - 1.2: each normalised Location has a non-empty name and a valid LocationType,
+//          carrying its served modes and matchQuality
+//   - 1.3: served modes drive each Location's priority tier (prioritiseLocations)
+//   - 1.4: matchQuality orders Locations within a priority tier
+//   - 1.1: prioritiseLocations caps the ordered result at 10
 //
 // IMPORTANT — untrusted input:
 //   EFA responses are treated as UNTRUSTED. The normaliser never assumes the
@@ -32,11 +35,24 @@ import {
 } from '../domain/journeyMath.js';
 import { estimateLegFare } from '../fares/index.js';
 
-/** Maximum number of locations returned to a client (Req 1.1). */
+/** Maximum number of prioritised locations returned to a client (Req 1.1). */
 const MAX_LOCATIONS = 10;
 
-/** Maximum number of journeys returned to a client (Req 2.2). */
-const MAX_JOURNEYS = 5;
+/**
+ * Mapping from EFA stop_finder `modes` integer codes to the normalised
+ * `TransportMode`. This is the SAME `class` → mode table used for legs, but
+ * restricted to the public-transport modes a stop can serve (Req 1.2 / design
+ * "EFA Response Mapping"). Codes outside this table are unknown and dropped.
+ */
+const STOP_FINDER_MODE_MAP: Readonly<Record<number, TransportMode>> = {
+  1: 'train',
+  2: 'metro',
+  4: 'lightRail',
+  5: 'bus',
+  7: 'coach',
+  9: 'ferry',
+  11: 'school',
+};
 
 /** The set of valid normalised location types (mirrors the LocationType union). */
 const VALID_LOCATION_TYPES: ReadonlySet<LocationType> = new Set<LocationType>([
@@ -249,6 +265,45 @@ function extractLocationEntries(efa: unknown): unknown[] {
 }
 
 /**
+ * Extract the served public-transport modes from an EFA stop-finder entry.
+ *
+ * EFA carries a `modes` array of integer `class` codes. Each code is mapped via
+ * {@link STOP_FINDER_MODE_MAP} to a `TransportMode`; unknown codes are dropped,
+ * and the result is de-duplicated while preserving first-seen order. Locations
+ * that serve no transit (addresses, POIs, suburbs) yield an empty array.
+ *
+ * Used to drive both the priority tier (Req 1.3) and display.
+ */
+function extractModes(entry: Record<string, unknown>): TransportMode[] {
+  const raw = entry['modes'];
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const seen = new Set<TransportMode>();
+  const modes: TransportMode[] = [];
+  for (const code of raw) {
+    const num = toFiniteNumber(code);
+    if (num === null || !Number.isInteger(num)) {
+      continue;
+    }
+    const mode = STOP_FINDER_MODE_MAP[num];
+    if (mode !== undefined && !seen.has(mode)) {
+      seen.add(mode);
+      modes.push(mode);
+    }
+  }
+  return modes;
+}
+
+/**
+ * Extract the EFA `matchQuality` (higher = better) used to order results within
+ * a priority tier (Req 1.4). Defaults to 0 when absent or non-numeric.
+ */
+function extractMatchQuality(entry: Record<string, unknown>): number {
+  return toFiniteNumber(entry['matchQuality']) ?? 0;
+}
+
+/**
  * Normalise a single raw EFA entry into a `Location`, or `null` if it cannot
  * yield a valid one.
  *
@@ -280,6 +335,8 @@ function normaliseLocationEntry(entry: unknown): Location | null {
     name,
     type: toLocationType(entry['type']),
     suburb: extractSuburb(entry),
+    modes: extractModes(entry),
+    matchQuality: extractMatchQuality(entry),
     coord: extractCoord(entry),
   };
 }
@@ -288,28 +345,26 @@ function normaliseLocationEntry(entry: unknown): Location | null {
  * Normalise a raw EFA stop-finder response into the client-facing
  * `Location[]` domain model.
  *
- * Behaviour (Req 1.1, 1.2):
+ * Behaviour (Req 1.2):
  *  - The EFA input is treated as untrusted: every field is probed and coerced
  *    defensively, and unrecognised structure simply produces fewer/no results
  *    rather than throwing.
  *  - Entries that cannot produce a valid Location (missing id or blank name)
  *    are skipped.
  *  - Each returned Location has a non-empty `name` and a `type` from the valid
- *    `LocationType` set; `suburb` and `coord` are populated where available,
- *    else `null`.
- *  - The result is capped at the first 10 valid locations.
+ *    `LocationType` set; `modes` and `matchQuality` are carried through (Req
+ *    1.3, 1.4); `suburb` and `coord` are populated where available, else `null`.
+ *  - ALL valid normalised locations are returned (no cap). Result ordering and
+ *    the cap-at-10 are applied later by {@link prioritiseLocations}.
  *
  * @param efa - the raw EFA stop-finder response (untrusted, of unknown shape)
- * @returns up to 10 normalised locations, in upstream order
+ * @returns all valid normalised locations, in upstream order
  */
 export function normaliseLocations(efa: unknown): Location[] {
   const entries = extractLocationEntries(efa);
   const locations: Location[] = [];
 
   for (const entry of entries) {
-    if (locations.length >= MAX_LOCATIONS) {
-      break;
-    }
     const location = normaliseLocationEntry(entry);
     if (location !== null) {
       locations.push(location);
@@ -317,6 +372,75 @@ export function normaliseLocations(efa: unknown): Location[] {
   }
 
   return locations;
+}
+
+// ---------------------------------------------------------------------------
+// Location Prioritisation Algorithm (design: "Location Prioritisation
+// Algorithm")
+// ---------------------------------------------------------------------------
+
+/**
+ * Assign a priority tier (1 = best) to a normalised `Location` from its served
+ * `modes` and `type`, per the design's Location Prioritisation Algorithm:
+ *
+ *   - Tier 1 — train or metro stations (`modes` includes `train` or `metro`).
+ *   - Tier 2 — ferry wharves (`modes` includes `ferry`).
+ *   - Tier 3 — bus stops (`modes` includes `bus`).
+ *   - Tier 4 — other transit: light rail, coach, or school bus (`modes`
+ *     includes any of these but none of the higher tiers).
+ *   - Tier 5 — non-transit: addresses, POIs, suburbs, or no transit modes.
+ *
+ * A multi-mode location takes the LOWEST (best) tier among its modes.
+ */
+function priorityTier(location: Location): number {
+  const modes = location.modes;
+  if (modes.includes('train') || modes.includes('metro')) {
+    return 1;
+  }
+  if (modes.includes('ferry')) {
+    return 2;
+  }
+  if (modes.includes('bus')) {
+    return 3;
+  }
+  if (modes.includes('lightRail') || modes.includes('coach') || modes.includes('school')) {
+    return 4;
+  }
+  return 5;
+}
+
+/**
+ * Order normalised locations for display and cap the list at 10 (Req 1.1, 1.3,
+ * 1.4 / design "Location Prioritisation Algorithm").
+ *
+ * Pure function: assigns each location a priority tier (see {@link priorityTier})
+ * and stable-sorts by `(tier ascending, matchQuality descending)`, so the most
+ * relevant transit locations appear first and equal `(tier, matchQuality)`
+ * entries retain their upstream order. The sorted list is then capped at the
+ * first 10 entries.
+ *
+ * @param locations - the full set of normalised locations (uncapped)
+ * @returns the prioritised locations, capped at 10
+ */
+export function prioritiseLocations(locations: Location[]): Location[] {
+  // Decorate with the original index to guarantee a stable sort across engines.
+  const decorated = locations.map((location, index) => ({
+    location,
+    index,
+    tier: priorityTier(location),
+  }));
+
+  decorated.sort((a, b) => {
+    if (a.tier !== b.tier) {
+      return a.tier - b.tier;
+    }
+    if (a.location.matchQuality !== b.location.matchQuality) {
+      return b.location.matchQuality - a.location.matchQuality;
+    }
+    return a.index - b.index;
+  });
+
+  return decorated.slice(0, MAX_LOCATIONS).map((d) => d.location);
 }
 
 // ===========================================================================
@@ -330,7 +454,8 @@ export function normaliseLocations(efa: unknown): Location[] {
 // journeys rather than throwing.
 //
 // Requirements covered by this section:
-//   - 2.2: journeys are capped at 5 and ordered by departure time
+//   - 2.2: journeys are ordered by departure time (the Route Service merge
+//          window now owns the result count; no cap here)
 //   - 2.3: travel time spans first departure to last arrival (incl. transfers)
 //   - 4.2: total fare is the sum of per-leg estimated fares
 //   - 4.3: per-leg Opal fares are computed from distance + mode
@@ -729,10 +854,12 @@ function extractJourneyEntries(efa: unknown): unknown[] {
  *  - Per-leg `fare` is the estimated adult Opal fare (walk/bicycle => null);
  *    journey `travelTimeMinutes`, `transferCount`, `modes`, and `totalFare` are
  *    derived with the shared `journeyMath` helpers.
- *  - Journeys are ordered by non-decreasing `departureTime`, then capped at 5.
+ *  - Journeys are ordered by non-decreasing `departureTime`. The result is NOT
+ *    capped here — the Route Service's earlier+later merge window now owns the
+ *    final count (design: "Route Service — Earlier + Later Window").
  *
  * @param efa - the raw EFA trip response (untrusted, of unknown shape)
- * @returns up to 5 normalised journeys, ordered by departure time
+ * @returns all normalised journeys, ordered by departure time
  */
 export function normaliseJourneys(efa: unknown): Journey[] {
   const entries = extractJourneyEntries(efa);
@@ -745,9 +872,9 @@ export function normaliseJourneys(efa: unknown): Journey[] {
     }
   }
 
-  // Order by non-decreasing departure time (stable sort), then cap at 5. All
-  // departureTime values are validated ISO timestamps, so Date.parse is finite.
+  // Order by non-decreasing departure time (stable sort). All departureTime
+  // values are validated ISO timestamps, so Date.parse is finite.
   journeys.sort((a, b) => Date.parse(a.departureTime) - Date.parse(b.departureTime));
 
-  return journeys.slice(0, MAX_JOURNEYS);
+  return journeys;
 }

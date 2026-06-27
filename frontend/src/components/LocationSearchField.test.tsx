@@ -42,6 +42,8 @@ const TOWN_HALL: Location = {
   name: 'Town Hall Station',
   type: 'station',
   suburb: 'Sydney',
+  modes: ['train'],
+  matchQuality: 950,
   coord: { lat: -33.873, lng: 151.207 },
 };
 
@@ -50,6 +52,8 @@ const CENTRAL: Location = {
   name: 'Central Station',
   type: 'station',
   suburb: 'Haymarket',
+  modes: ['train', 'metro'],
+  matchQuality: 1000,
   coord: { lat: -33.883, lng: 151.206 },
 };
 

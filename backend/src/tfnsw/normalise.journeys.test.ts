@@ -3,14 +3,15 @@ import fc from 'fast-check';
 
 import { normaliseJourneys } from './normalise.js';
 
-// Feature: tfnsw-route-planner, Property 4: Journeys are capped at 5 and ordered by departure
+// Feature: tfnsw-route-planner, Property 4: Journeys are ordered by departure
 //
 // Validates: Requirements 2.2
 //
 // For any EFA trip payload `{ journeys: [...] }` containing N journeys (each
 // built from valid legs whose stops carry ISO departure/arrival timestamps and
 // whose `transportation.product.class` denotes a mode), `normaliseJourneys`:
-//   - returns AT MOST 5 journeys (the MAX_JOURNEYS cap, Req 2.2), and
+//   - returns ALL N valid journeys (the 5-entry cap was removed — the Route
+//     Service merge window now owns the result count, Req 2.2), and
 //   - returns them ordered by NON-DECREASING `departureTime`.
 //
 // The generator emits EFA-shaped journeys matching the verified efa11 schema:
@@ -19,10 +20,9 @@ import { normaliseJourneys } from './normalise.js';
 //   - mode is carried by `transportation.product.class` (an integer code);
 //   - `leg.duration` is in seconds and `leg.distance` is in metres.
 // Every generated leg is VALID (parseable times, present stops) so each journey
-// survives normalisation — isolating the cap + ordering behaviour from the
+// survives normalisation — isolating the count + ordering behaviour from the
 // validity/coercion behaviour exercised by other tests.
 
-const MAX_JOURNEYS = 5;
 const MS_PER_MINUTE = 60_000;
 
 /** EFA `transportation.product.class` codes the normaliser maps to a mode. */
@@ -111,16 +111,15 @@ const EFA_TRIP_PAYLOAD_ARB = fc
   .array(JOURNEY_ARB, { minLength: 0, maxLength: 12 })
   .map((journeys) => ({ payload: { journeys }, n: journeys.length }));
 
-describe('normaliseJourneys cap and ordering (Property 4)', () => {
-  it('returns at most 5 journeys, ordered by non-decreasing departureTime', () => {
+describe('normaliseJourneys ordering (Property 4)', () => {
+  it('returns all valid journeys, ordered by non-decreasing departureTime', () => {
     fc.assert(
       fc.property(EFA_TRIP_PAYLOAD_ARB, ({ payload, n }) => {
         const result = normaliseJourneys(payload);
 
-        // Cap: never more than 5, and exactly min(N, 5) for these all-valid
-        // payloads (every generated journey is normalisable).
-        expect(result.length).toBeLessThanOrEqual(MAX_JOURNEYS);
-        expect(result.length).toBe(Math.min(n, MAX_JOURNEYS));
+        // No cap: every generated journey is normalisable, so the result holds
+        // exactly N journeys (the 5-entry cap was removed in task 15.1).
+        expect(result.length).toBe(n);
 
         // Ordering: departureTime is non-decreasing across the returned list.
         for (let i = 1; i < result.length; i += 1) {
@@ -137,11 +136,11 @@ describe('normaliseJourneys cap and ordering (Property 4)', () => {
 
   // --- Concrete anchoring examples -----------------------------------------
 
-  it('caps a payload of 12 journeys at 5', () => {
+  it('returns all 12 journeys (no cap)', () => {
     const journeys = Array.from({ length: 12 }, (_, i) => ({
       legs: [makeLeg(i * 10, 5, 1, 1000).leg],
     }));
-    expect(normaliseJourneys({ journeys }).length).toBe(5);
+    expect(normaliseJourneys({ journeys }).length).toBe(12);
   });
 
   it('orders out-of-order journeys by departure time', () => {

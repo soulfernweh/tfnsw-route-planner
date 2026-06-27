@@ -269,3 +269,45 @@ export function tripCacheKey(
 ): string {
   return buildCacheKey('trip', originId, destinationId, timeBucket);
 }
+
+/**
+ * Cache key for a merged earlier+later trip WINDOW (see the design's
+ * "Route Service — Earlier + Later Window"). The Route Service issues two trip
+ * queries around the Selected_Time and caches the merged, de-duplicated,
+ * ordered journey window under this key.
+ *
+ * The key distinguishes results by:
+ *  - `(originId, destinationId)` — the route,
+ *  - `depArr` — whether the window is built around a depart-at or arrive-by
+ *    Selected_Time (the two produce different windows),
+ *  - `includedModesSignature` — a canonical signature of the included selectable
+ *    modes (or `'all'` when no exclusion applies), so different Mode_Selections
+ *    do not share an entry, and
+ *  - `timeBucket` — the bucketed Selected_Time (see {@link tripTimeBucket}).
+ *
+ * This is intentionally separate from {@link tripCacheKey} so existing
+ * single-query trip caching elsewhere is unaffected.
+ *
+ * @param originId - origin location id
+ * @param destinationId - destination location id
+ * @param depArr - depart-at (`'dep'`) vs arrive-by (`'arr'`) Selected_Time
+ * @param includedModesSignature - canonical included-modes signature or `'all'`
+ * @param timeBucket - bucket start epoch ms (see {@link tripTimeBucket})
+ * @returns the cache key
+ */
+export function tripWindowCacheKey(
+  originId: string,
+  destinationId: string,
+  depArr: 'dep' | 'arr',
+  includedModesSignature: string,
+  timeBucket: number,
+): string {
+  return buildCacheKey(
+    'tripWindow',
+    originId,
+    destinationId,
+    depArr,
+    includedModesSignature,
+    timeBucket,
+  );
+}

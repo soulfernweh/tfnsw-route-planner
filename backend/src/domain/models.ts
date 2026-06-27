@@ -51,6 +51,17 @@ export interface Location {
   type: LocationType;
   /** Parent locality, where provided. */
   suburb: string | null;
+  /**
+   * Served public-transport modes, mapped from the stop_finder `modes` integer
+   * codes. Empty when the location serves no transit (e.g. address/POI/suburb).
+   * Drives the result priority tier (Req 1.3) and is surfaced for display.
+   */
+  modes: TransportMode[];
+  /**
+   * EFA `matchQuality` (higher = better); orders results within a priority tier
+   * (Req 1.4). Defaults to 0 when absent.
+   */
+  matchQuality: number;
   /** Geographic coordinate (latitude/longitude), where provided. */
   coord: {
     lat: number;
@@ -138,9 +149,36 @@ export interface Journey {
 export interface RouteRequest {
   originId: string;
   destinationId: string;
-  /** ISO 8601 desired departure time. */
+  /** ISO 8601 Selected_Time, interpreted per `depArr`. */
   time: string;
+  /**
+   * 'dep' = depart at/after `time` (Leave now / Leave at); 'arr' = arrive
+   * at/before `time` (Arrive by). "Leave now" is modelled as 'dep' with
+   * `time` set to the current time.
+   */
+  depArr: 'dep' | 'arr';
+  /**
+   * Transit modes to include in results. An empty list OR a list containing all
+   * selectable modes means "no exclusion" (include everything). Any strict,
+   * non-empty subset causes the complement to be excluded upstream.
+   * walk/bicycle are connectors and are never part of this set.
+   */
+  includedModes: TransportMode[];
 }
+
+/**
+ * The selectable public-transport modes a user can include/exclude
+ * (Requirement 6). Order matches the Mode_Selection control. walk/bicycle/other
+ * are NOT selectable.
+ */
+export type SelectableMode =
+  | 'train'
+  | 'metro'
+  | 'lightRail'
+  | 'bus'
+  | 'coach'
+  | 'ferry'
+  | 'school';
 
 /**
  * A single side of the fastest-vs-economical comparison.
@@ -226,5 +264,12 @@ export interface RouteRankingEngine {
  */
 export interface TfnswClient {
   stopFinder(query: string): Promise<Location[]>;
-  trip(originId: string, destinationId: string, time: Date): Promise<Journey[]>;
+  trip(params: {
+    originId: string;
+    destinationId: string;
+    time: Date;
+    depArr: 'dep' | 'arr';
+    calcNumberOfTrips?: number;
+    excludedModes?: SelectableMode[];
+  }): Promise<Journey[]>;
 }

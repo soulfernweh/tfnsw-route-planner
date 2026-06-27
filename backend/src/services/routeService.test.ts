@@ -3,7 +3,7 @@ import fc from 'fast-check';
 
 import { RouteService, type RoutePlanningClient } from './routeService.js';
 import { ValidationError } from '../domain/errors.js';
-import type { Journey } from '../domain/models.js';
+import type { Journey, SelectableMode } from '../domain/models.js';
 
 // Feature: tfnsw-route-planner, Property 6: Identical origin and destination are rejected
 //
@@ -29,7 +29,14 @@ import type { Journey } from '../domain/models.js';
 class SpyRoutePlanningClient implements RoutePlanningClient {
   public tripCallCount = 0;
 
-  public async trip(): Promise<Journey[]> {
+  public async trip(_params: {
+    originId: string;
+    destinationId: string;
+    time: Date;
+    depArr: 'dep' | 'arr';
+    calcNumberOfTrips?: number;
+    excludedModes?: SelectableMode[];
+  }): Promise<Journey[]> {
     this.tripCallCount += 1;
     return [];
   }
@@ -55,7 +62,13 @@ describe('RouteService.planRoutes identical origin/destination rejection (Proper
         const service = new RouteService(client);
 
         await expect(
-          service.planRoutes({ originId: id, destinationId: id, time }),
+          service.planRoutes({
+            originId: id,
+            destinationId: id,
+            time,
+            depArr: 'dep',
+            includedModes: [],
+          }),
         ).rejects.toBeInstanceOf(ValidationError);
 
         // The upstream client must never be touched for an invalid request.
@@ -76,6 +89,8 @@ describe('RouteService.planRoutes identical origin/destination rejection (Proper
         originId: 'G10111',
         destinationId: 'G10111',
         time: '2025-01-01T09:00:00Z',
+        depArr: 'dep',
+        includedModes: [],
       }),
     ).rejects.toBeInstanceOf(ValidationError);
     expect(client.tripCallCount).toBe(0);
@@ -86,7 +101,13 @@ describe('RouteService.planRoutes identical origin/destination rejection (Proper
     const service = new RouteService(client);
 
     await expect(
-      service.planRoutes({ originId: '', destinationId: '', time: '' }),
+      service.planRoutes({
+        originId: '',
+        destinationId: '',
+        time: '',
+        depArr: 'dep',
+        includedModes: [],
+      }),
     ).rejects.toBeInstanceOf(ValidationError);
     expect(client.tripCallCount).toBe(0);
   });

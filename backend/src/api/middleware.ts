@@ -28,7 +28,7 @@
 // Design reference: .kiro/specs/tfnsw-route-planner/design.md
 //   ("REST API Endpoints", "Security"). Requirements: 2.5.
 
-import type { RouteRequest } from '../domain/models.js';
+import type { RouteRequest, SelectableMode, TransportMode } from '../domain/models.js';
 import { ValidationError } from '../domain/errors.js';
 
 // ---------------------------------------------------------------------------
@@ -137,6 +137,18 @@ export function validateLocationQuery(params: QueryParams): ValidatedLocationQue
  *  - `time` is OPTIONAL. When present it must be a valid ISO 8601 date-time;
  *    when absent it defaults to an empty string (the `RouteService` interprets
  *    an empty time as "depart now").
+ *  - `when` is OPTIONAL (the Time_Filter). When present it must be one of
+ *    `leaveNow | leaveAt | arriveBy`; when absent it defaults to `leaveNow`.
+ *    It is mapped to `depArr`: `leaveNow`/`leaveAt` → `'dep'`, `arriveBy` →
+ *    `'arr'` (Req 7.1-7.5).
+ *  - `modes` is OPTIONAL (the Mode_Selection). It is a comma-separated list of
+ *    selectable modes given as names (train/metro/lightRail/bus/coach/ferry/
+ *    school) and/or numeric class codes (1/2/4/5/7/9/11, which map to those
+ *    names). Each entry must be an allowlisted selectable mode (else a
+ *    `ValidationError`). When OMITTED entirely, `includedModes` defaults to all
+ *    seven selectable modes (include everything). When PRESENT but empty/blank
+ *    (an explicit "none selected"), a `ValidationError` is thrown — at least one
+ *    transport mode is required (Req 6.4).
  *
  * This function deliberately does NOT reject identical origin/destination —
  * that domain rule (Req 2.5) is enforced by `RouteService.planRoutes`, which is
@@ -153,8 +165,10 @@ export function validateRouteParams(params: QueryParams): RouteRequest {
     'destinationId',
   );
   const time = validateOptionalIsoTime(getParam(params, 'time'));
+  const depArr = validateWhen(getParam(params, 'when'));
+  const includedModes = validateModes(getParam(params, 'modes'));
 
-  return { originId, destinationId, time };
+  return { originId, destinationId, time, depArr, includedModes };
 }
 
 /**
@@ -190,6 +204,120 @@ function validateOptionalIsoTime(value: string | undefined): string {
     throw new ValidationError('The "time" parameter must be a valid ISO 8601 date-time.');
   }
   return value;
+}
+
+// ---------------------------------------------------------------------------
+// `when` (Time_Filter) and `modes` (Mode_Selection) validation (Req 6, 7)
+// ---------------------------------------------------------------------------
+
+/** The allowlisted `when` (Time_Filter) values and their `depArr` mapping. */
+const WHEN_TO_DEP_ARR: Record<string, 'dep' | 'arr'> = {
+  leaveNow: 'dep',
+  leaveAt: 'dep',
+  arriveBy: 'arr',
+};
+
+/** The seven user-selectable transport modes, in Mode_Selection order. */
+const SELECTABLE_MODES: readonly SelectableMode[] = [
+  'train',
+  'metro',
+  'lightRail',
+  'bus',
+  'coach',
+  'ferry',
+  'school',
+];
+
+/** Lookup set for selectable-mode names (case-sensitive allowlist). */
+const SELECTABLE_MODE_SET = new Set<string>(SELECTABLE_MODES);
+
+/**
+ * EFA `transportation.product.class` codes accepted in `modes`, mapped to their
+ * selectable-mode name. Mirrors the design's transport mode table.
+ */
+const MODE_CODE_TO_NAME: Record<string, SelectableMode> = {
+  '1': 'train',
+  '2': 'metro',
+  '4': 'lightRail',
+  '5': 'bus',
+  '7': 'coach',
+  '9': 'ferry',
+  '11': 'school',
+};
+
+/**
+ * Validate the OPTIONAL `when` (Time_Filter) parameter and map it to `depArr`.
+ *
+ * Rules:
+ *  - Absent (or blank) → defaults to `leaveNow` → `depArr='dep'`.
+ *  - Present → must be one of `leaveNow | leaveAt | arriveBy` (allowlist).
+ *    `leaveNow`/`leaveAt` map to `'dep'`; `arriveBy` maps to `'arr'`.
+ *
+ * @param value - the raw parameter value (may be undefined)
+ * @returns the mapped `depArr`
+ * @throws {ValidationError} when present but not an allowlisted value
+ */
+function validateWhen(value: string | undefined): 'dep' | 'arr' {
+  if (value === undefined || value.trim() === '') {
+    return 'dep';
+  }
+  const depArr = WHEN_TO_DEP_ARR[value];
+  if (depArr === undefined) {
+    throw new ValidationError(
+      'The "when" parameter must be one of leaveNow, leaveAt, or arriveBy.',
+    );
+  }
+  return depArr;
+}
+
+/**
+ * Validate the OPTIONAL `modes` (Mode_Selection) parameter into the included
+ * selectable modes.
+ *
+ * Rules (Req 6.1, 6.3, 6.4):
+ *  - OMITTED entirely (undefined) → include EVERYTHING (all seven selectable
+ *    modes), since "no filter" means no exclusion.
+ *  - PRESENT but empty/blank (e.g. `modes=` or only whitespace/commas) → an
+ *    explicit "none selected", which is invalid: at least one transport mode is
+ *    required.
+ *  - Otherwise → a comma-separated list of names (train/metro/lightRail/bus/
+ *    coach/ferry/school) and/or numeric codes (1/2/4/5/7/9/11). Each entry must
+ *    resolve to an allowlisted selectable mode; duplicates collapse.
+ *
+ * @param value - the raw parameter value (may be undefined)
+ * @returns the included selectable modes (as {@link TransportMode}[])
+ * @throws {ValidationError} when explicitly empty or any entry is not allowlisted
+ */
+function validateModes(value: string | undefined): TransportMode[] {
+  // Omitted entirely → include everything (no exclusion).
+  if (value === undefined) {
+    return [...SELECTABLE_MODES];
+  }
+
+  const entries = value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+
+  // Present but empty/blank → explicit "none selected" (Req 6.4).
+  if (entries.length === 0) {
+    throw new ValidationError('At least one transport mode is required.');
+  }
+
+  const included: TransportMode[] = [];
+  for (const entry of entries) {
+    const name = MODE_CODE_TO_NAME[entry] ?? entry;
+    if (!SELECTABLE_MODE_SET.has(name)) {
+      throw new ValidationError(
+        `The "modes" parameter contains an unsupported transport mode: "${entry}".`,
+      );
+    }
+    if (!included.includes(name as TransportMode)) {
+      included.push(name as TransportMode);
+    }
+  }
+
+  return included;
 }
 
 // ---------------------------------------------------------------------------

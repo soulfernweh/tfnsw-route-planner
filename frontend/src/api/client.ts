@@ -15,7 +15,12 @@
 // envelope code/message where available.
 
 import { getApiBaseUrl } from './config';
-import type { ApiErrorEnvelope, Location, RouteResult } from './types';
+import type {
+  ApiErrorEnvelope,
+  Location,
+  RouteResult,
+  SelectableMode,
+} from './types';
 
 /**
  * Error thrown by the API client for any non-successful response or transport
@@ -43,12 +48,37 @@ export interface ApiClientOptions {
   fetchFn?: typeof fetch;
 }
 
+/** The Time_Filter mode for a route search (Requirement 7). */
+export type WhenFilter = 'leaveNow' | 'leaveAt' | 'arriveBy';
+
+/** The seven user-selectable modes; mirrors {@link SelectableMode}. */
+export const ALL_SELECTABLE_MODES: readonly SelectableMode[] = [
+  'train',
+  'metro',
+  'lightRail',
+  'bus',
+  'coach',
+  'ferry',
+  'school',
+];
+
 /** Parameters for a route-planning request. */
 export interface PlanRoutesParams {
   originId: string;
   destinationId: string;
-  /** ISO 8601 desired departure time. Optional; backend defaults to "now". */
+  /** ISO 8601 desired departure/arrival time. Optional; backend defaults to "now". */
   time?: string;
+  /**
+   * The Time_Filter (Req 7). `leaveNow`/`leaveAt` depart at/after `time`,
+   * `arriveBy` arrives at/before `time`. Defaults to `leaveNow`.
+   */
+  when?: WhenFilter;
+  /**
+   * The included selectable modes (Req 6). When ALL seven are selected the
+   * `modes` param is omitted (meaning "include everything"); a strict,
+   * non-empty subset is sent as a comma-separated list.
+   */
+  modes?: SelectableMode[];
 }
 
 /**
@@ -78,20 +108,39 @@ export class ApiClient {
   }
 
   /**
-   * Route discovery + ranking + comparison (Requirements 2-5).
-   * `GET /api/routes?originId={o}&destinationId={d}&time={iso}`
+   * Route discovery + ranking + comparison (Requirements 2-7).
+   * `GET /api/routes?originId={o}&destinationId={d}&time={iso}&when={when}&modes={csv}`
    */
   async planRoutes(
     params: PlanRoutesParams,
     signal?: AbortSignal,
   ): Promise<RouteResult> {
+    const when: WhenFilter = params.when ?? 'leaveNow';
+
     const search = new URLSearchParams({
       originId: params.originId,
       destinationId: params.destinationId,
     });
-    if (params.time !== undefined) {
+
+    // `time` is only meaningful for leaveAt/arriveBy; leaveNow uses server time.
+    if (when !== 'leaveNow' && params.time !== undefined) {
       search.set('time', params.time);
     }
+
+    search.set('when', when);
+
+    // Omit `modes` entirely when ALL selectable modes are included (means
+    // "include everything"); send a comma-separated list for any strict,
+    // non-empty subset.
+    if (params.modes !== undefined) {
+      const included = ALL_SELECTABLE_MODES.filter((mode) =>
+        params.modes!.includes(mode),
+      );
+      if (included.length > 0 && included.length < ALL_SELECTABLE_MODES.length) {
+        search.set('modes', included.join(','));
+      }
+    }
+
     return this.request<RouteResult>(`/api/routes?${search.toString()}`, signal);
   }
 

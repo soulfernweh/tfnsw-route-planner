@@ -23,7 +23,12 @@
 //
 // Requirements: 1.1, 1.5, 2.2, 2.6, Security "API key protection".
 
-import type { Journey, Location, TfnswClient as ITfnswClient } from '../domain/models.js';
+import type {
+  Journey,
+  Location,
+  SelectableMode,
+  TfnswClient as ITfnswClient,
+} from '../domain/models.js';
 import { ServiceUnavailableError } from '../domain/errors.js';
 import { normaliseJourneys, normaliseLocations } from './normalise.js';
 
@@ -38,6 +43,24 @@ export type DepArrMode = 'dep' | 'arr';
 
 /** Default upstream base URL (note the trailing slash — paths are relative). */
 const DEFAULT_BASE_URL = 'https://api.transport.nsw.gov.au/v1/tp/';
+
+/** Default number of trips the `trip` endpoint should return per query. */
+const DEFAULT_CALC_NUMBER_OF_TRIPS = 6;
+
+/**
+ * EFA `exclMOT_<code>` mode codes for each selectable Transport_Mode. Excluding
+ * a mode means emitting `exclMOT_<code>=1` for its code (plus a single
+ * `excludedMeans=checkbox`). Mirrors the `transportation.product.class` table.
+ */
+const EXCL_MOT_CODE: Record<SelectableMode, number> = {
+  train: 1,
+  metro: 2,
+  lightRail: 4,
+  bus: 5,
+  coach: 7,
+  ferry: 9,
+  school: 11,
+};
 
 /** Per-request timeout budgets (design: search ≤ 3s, route ≤ 5s). */
 const DEFAULT_STOP_FINDER_TIMEOUT_MS = 3_000;
@@ -148,32 +171,64 @@ export class TfnswClient implements ITfnswClient {
   /**
    * Plan journeys between two stop ids at a given time.
    *
-   * Calls the `trip` endpoint and returns the normalised `Journey[]` (capped at
-   * 5, ordered by departure). `time` is interpreted in Australia/Sydney local
-   * time for the upstream `itdDate`/`itdTime` params. `mode` selects whether the
-   * time is a desired departure (`dep`, default) or arrival (`arr`). Throws
-   * `ServiceUnavailableError` on any upstream failure.
+   * Calls the `trip` endpoint and returns the normalised `Journey[]` (ordered by
+   * departure). `params.time` is interpreted in Australia/Sydney local time for
+   * the upstream `itdDate`/`itdTime` params. `params.depArr` selects whether the
+   * time is a desired departure (`dep`) or arrival (`arr`). `calcNumberOfTrips`
+   * caps the number of trips the API returns for this query (default 6).
+   *
+   * Mode exclusion: for each mode in `params.excludedModes` the client emits
+   * `exclMOT_<code>=1` (codes: train 1, metro 2, lightRail 4, bus 5, coach 7,
+   * ferry 9, school 11) plus a single `excludedMeans=checkbox`. When
+   * `excludedModes` is empty/undefined, NO exclusion params are sent (all modes
+   * included). Throws `ServiceUnavailableError` on any upstream failure.
    */
-  public async trip(
-    originId: string,
-    destinationId: string,
-    time: Date,
-    mode: DepArrMode = 'dep',
-  ): Promise<Journey[]> {
+  public async trip(params: {
+    originId: string;
+    destinationId: string;
+    time: Date;
+    depArr: DepArrMode;
+    calcNumberOfTrips?: number;
+    excludedModes?: SelectableMode[];
+  }): Promise<Journey[]> {
+    const {
+      originId,
+      destinationId,
+      time,
+      depArr,
+      calcNumberOfTrips = DEFAULT_CALC_NUMBER_OF_TRIPS,
+      excludedModes,
+    } = params;
+
     const { itdDate, itdTime } = sydneyDateTimeParts(time);
 
-    const params = new URLSearchParams({
+    const requestParams = new URLSearchParams({
       type_origin: 'stop',
       name_origin: originId,
       type_destination: 'stop',
       name_destination: destinationId,
-      depArrMacro: mode,
+      depArrMacro: depArr,
       itdDate,
       itdTime,
+      calcNumberOfTrips: String(calcNumberOfTrips),
       TfNSWTR: 'true',
     });
 
-    const payload = await this.requestJson('trip', params, this.tripTimeoutMs);
+    // Mode exclusion: only emit params when there is at least one excluded mode.
+    // For each excluded mode, emit exclMOT_<code>=1; add a single
+    // excludedMeans=checkbox to activate the exclusion filter upstream.
+    if (excludedModes !== undefined && excludedModes.length > 0) {
+      requestParams.set('excludedMeans', 'checkbox');
+      for (const mode of excludedModes) {
+        requestParams.set(`exclMOT_${EXCL_MOT_CODE[mode]}`, '1');
+      }
+    }
+
+    const payload = await this.requestJson(
+      'trip',
+      requestParams,
+      this.tripTimeoutMs,
+    );
     return normaliseJourneys(payload);
   }
 

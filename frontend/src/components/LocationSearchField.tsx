@@ -32,6 +32,7 @@ import {
 
 import { apiClient, type ApiClient } from '../api/client';
 import type { Location, LocationType } from '../api/types';
+import { formatMode } from './routeFormat';
 import './LocationSearchField.css';
 
 /** Minimum trimmed query length before the API is queried (Req 1.1, 1.6). */
@@ -383,6 +384,23 @@ export function LocationSearchField({
                     </span>
                   )}
                 </span>
+                {location.modes.length > 0 && (
+                  <span
+                    className="location-search__option-modes"
+                    aria-label={`Served modes: ${location.modes
+                      .map((mode) => formatMode(mode))
+                      .join(', ')}`}
+                  >
+                    {location.modes.map((mode, modeIndex) => (
+                      <span
+                        key={`${mode}-${modeIndex}`}
+                        className={`location-search__mode-tag location-search__mode-tag--${mode}`}
+                      >
+                        {formatMode(mode)}
+                      </span>
+                    ))}
+                  </span>
+                )}
               </li>
             );
           })}

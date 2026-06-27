@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import fc from 'fast-check';
 
-import { normaliseLocations } from './normalise.js';
+import { normaliseLocations, prioritiseLocations } from './normalise.js';
 import type { LocationType } from '../domain/models.js';
 
 // Feature: tfnsw-route-planner, Property 1: Location results are capped at 10
@@ -9,8 +9,14 @@ import type { LocationType } from '../domain/models.js';
 // Validates: Requirements 1.1
 //
 // For any upstream stop-finder response containing N valid location entries,
-// the normalised location list returned by `normaliseLocations` has length
-// equal to `min(N, 10)`, and never exceeds 10.
+// the prioritised location list returned by
+// `prioritiseLocations(normaliseLocations(efa))` has length equal to
+// `min(N, 10)`, and never exceeds 10.
+//
+// NOTE: `normaliseLocations` no longer caps its output — it returns ALL valid
+// normalised locations. The cap-at-10 now lives in the pure `prioritiseLocations`
+// function (which also orders results by priority tier + match quality). This
+// property therefore exercises the cap through that function.
 //
 // `normaliseLocations(efa)` accepts the raw (untrusted) EFA stop-finder payload
 // and returns the normalised `Location[]`. The modern EFA shape is
@@ -77,11 +83,16 @@ const EFA_PAYLOAD_ARB = fc
   .array(EFA_ENTRY_ARB, { minLength: 0, maxLength: 30 })
   .map((locations) => ({ payload: { locations }, n: locations.length }));
 
-describe('normaliseLocations location cap (Property 1)', () => {
+describe('prioritiseLocations location cap (Property 1)', () => {
   it('returns exactly min(N, 10) locations and never exceeds 10', () => {
     fc.assert(
       fc.property(EFA_PAYLOAD_ARB, ({ payload, n }) => {
-        const result = normaliseLocations(payload);
+        // The cap now lives in prioritiseLocations; normaliseLocations returns
+        // all N valid locations, which we then prioritise + cap.
+        const normalised = normaliseLocations(payload);
+        expect(normalised.length).toBe(n);
+
+        const result = prioritiseLocations(normalised);
 
         // Core property: count equals min(N, 10).
         expect(result.length).toBe(Math.min(n, 10));
@@ -110,7 +121,7 @@ describe('normaliseLocations location cap (Property 1)', () => {
       name: `Stop ${i}`,
       type: 'stop',
     }));
-    expect(normaliseLocations({ locations }).length).toBe(10);
+    expect(prioritiseLocations(normaliseLocations({ locations })).length).toBe(10);
   });
 
   it('returns all entries when N is below the cap', () => {
@@ -119,10 +130,10 @@ describe('normaliseLocations location cap (Property 1)', () => {
       name: `Stop ${i}`,
       type: 'stop',
     }));
-    expect(normaliseLocations({ locations }).length).toBe(4);
+    expect(prioritiseLocations(normaliseLocations({ locations })).length).toBe(4);
   });
 
   it('returns an empty list for zero entries', () => {
-    expect(normaliseLocations({ locations: [] })).toEqual([]);
+    expect(prioritiseLocations(normaliseLocations({ locations: [] }))).toEqual([]);
   });
 });

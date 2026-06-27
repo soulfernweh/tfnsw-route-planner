@@ -24,8 +24,24 @@ export type TransportMode =
   | 'lightRail'
   | 'coach'
   | 'walk'
+  | 'bicycle'
   | 'school'
   | 'other';
+
+/**
+ * The seven user-selectable public-transport modes for the Mode Selection
+ * control (Requirement 6). Mirrors the backend `SelectableMode` union. The
+ * order matches the Mode_Selection control; walk/bicycle/other are NOT
+ * selectable.
+ */
+export type SelectableMode =
+  | 'train'
+  | 'metro'
+  | 'lightRail'
+  | 'bus'
+  | 'coach'
+  | 'ferry'
+  | 'school';
 
 /**
  * A transport stop, station, platform, or point of interest that can serve as
@@ -40,6 +56,17 @@ export interface Location {
   type: LocationType;
   /** Parent locality, where provided. */
   suburb: string | null;
+  /**
+   * Served public-transport modes, mapped from the stop_finder mode codes.
+   * Empty when the location serves no transit (e.g. address/POI/suburb). Used
+   * for result ordering (priority tier) and for display.
+   */
+  modes: TransportMode[];
+  /**
+   * EFA match quality (higher = better); used to order results within a
+   * priority tier. Defaults to 0 when absent.
+   */
+  matchQuality: number;
   /** Geographic coordinate (latitude/longitude), where provided. */
   coord: {
     lat: number;

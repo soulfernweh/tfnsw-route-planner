@@ -288,3 +288,98 @@ All property tests use a mature PBT library (`fast-check`), run a minimum of 100
   ]
 }
 ```
+
+## Enhancements
+
+These tasks layer the prioritised search, earlier+later window, mode selection, and time filter onto the completed build above. They follow the updated design (Location Prioritisation Algorithm, Earlier + Later Window, mode-exclusion mapping, and the `when`/`modes` REST params) and reuse the existing TypeScript stack and `fast-check` conventions. All earlier tasks (1–13) are complete and unchanged.
+
+- [ ] 14. Extend domain models for prioritisation, time filter, and mode selection
+  - [ ] 14.1 Add new model fields and the selectable-mode type
+    - In `backend/src/domain/models.ts`, add `modes: TransportMode[]` and `matchQuality: number` to `Location` (served modes drive priority tier and display; `matchQuality` orders within a tier, defaulting to 0)
+    - Add `depArr: 'dep' | 'arr'` and `includedModes: TransportMode[]` to `RouteRequest` ('dep' = Leave now / Leave at, 'arr' = Arrive by; empty or full `includedModes` ⇒ no exclusion)
+    - Add the `SelectableMode` union (`'train' | 'metro' | 'lightRail' | 'bus' | 'coach' | 'ferry' | 'school'`) for the seven user-selectable Transport_Modes
+    - _Requirements: 1.3, 6.1, 6.3, 7.3, 7.4_
+
+- [ ] 15. Implement location normalisation modes/matchQuality and the prioritisation algorithm
+  - [ ] 15.1 Carry modes/matchQuality through the normaliser, add `prioritiseLocations`, and remove the journey cap
+    - In `backend/src/tfnsw/normalise.ts`, update `normaliseLocations` to map the stop_finder `modes` integer codes via the `class`→mode table (1 train, 2 metro, 4 lightRail, 5 bus, 7 coach, 9 ferry, 11 school) into a deduplicated `Location.modes`, and carry `matchQuality` (default 0 when absent)
+    - Add a pure `prioritiseLocations(locations)` implementing the Location Prioritisation Algorithm: assign a priority tier (1 train/metro station, 2 ferry, 3 bus, 4 other transit incl. light rail/coach/school, 5 address/POI/suburb; multi-mode locations take the lowest/best tier), stable-sort by `(tier ascending, matchQuality descending)`, then cap at the first 10
+    - Remove the 5-entry cap from `normaliseJourneys` (the merge window in the Route Service now owns the result count); keep `departureTime` ordering
+    - _Requirements: 1.2, 1.3, 1.4, 2.2_
+
+  - [ ]* 15.2 Write property test for location prioritisation ordering
+    - New file `backend/src/tfnsw/normalise.prioritise.test.ts`
+    - **Property 15: Location prioritisation orders by tier then match quality**
+    - **Validates: Requirements 1.3, 1.4**
+
+  - [ ]* 15.3 Update existing normaliser tests for the new Location fields and the journey-cap removal
+    - Update `normalise.cap.test.ts` (location-result cap of 10 now lives in prioritisation; remove/adjust the journey 5-cap expectation), `normalise.completeness.test.ts` (assert `modes` + `matchQuality` populated), `normalise.roundtrip.test.ts` (round-trip the new fields), `normalise.journeys.test.ts` (no longer capped at 5), and `normalise.distance.test.ts` (unchanged distance assertions still pass against the new shape)
+    - _Requirements: 1.2, 1.3, 2.2_
+
+- [ ] 16. Add mode exclusion and the params-object trip signature to the TfNSW client
+  - [ ] 16.1 Change `trip(...)` to a params object and emit mode-exclusion params
+    - In `backend/src/tfnsw/client.ts`, change `trip(...)` to accept `{ originId, destinationId, time, depArr, calcNumberOfTrips?, excludedModes? }` with `depArrMacro=dep|arr` and `calcNumberOfTrips` defaulting to 6
+    - For each excluded mode emit `exclMOT_<code>=1` (codes 1/2/4/5/7/9/11) plus a single `excludedMeans=checkbox`; when `excludedModes` is empty, send NO exclusion params
+    - Update callers/tests broken by the new signature: `backend/src/services/routeService.ts` (call site), `backend/src/tfnsw/client.test.ts`, and `backend/src/api/routes.integration.test.ts`
+    - _Requirements: 6.3, 7.3, 7.4_
+
+  - [ ]* 16.2 Write property test for the mode-exclusion mapping
+    - New file `backend/src/tfnsw/client.modeExclusion.test.ts`
+    - **Property 16: Mode-exclusion mapping emits the complement of included modes**
+    - **Validates: Requirements 6.3**
+
+- [ ] 17. Implement the earlier+later window in the Route Service
+  - [ ] 17.1 Issue two trip queries, merge, de-duplicate, and order the window
+    - In `backend/src/services/routeService.ts`, issue two `trip` queries (forward + opposite direction) around the Selected_Time, merge their journeys, de-duplicate by the stable signature `(first leg origin stop, last leg destination stop, departureTime, arrivalTime)`, and order by non-decreasing `departureTime`, guaranteeing at least 5 earlier trips when the opposite-direction query offers them
+    - Map `includedModes` to its excluded complement and apply it identically to BOTH queries
+    - Include `depArr`, a canonical `includedModes` signature, and the time bucket in the trip cache key
+    - Update `backend/src/services/routeService.test.ts` and `backend/src/services/services.emptyResults.test.ts` as needed for the two-query window
+    - _Requirements: 2.2, 7.3, 7.4, 7.5_
+
+  - [ ]* 17.2 Write property test for the merged journey window
+    - New file `backend/src/services/routeService.window.test.ts`
+    - **Property 4: Journey window is ordered, de-duplicated, and includes earlier trips**
+    - **Validates: Requirements 2.2**
+
+- [ ] 18. Extend the REST API and middleware for `when` and `modes`
+  - [ ] 18.1 Parse, allowlist, and map the new query parameters
+    - In `backend/src/api/routes.ts`, accept `when=leaveNow|leaveAt|arriveBy` and `modes` (comma-separated codes or names) on `GET /api/routes`
+    - In `backend/src/api/middleware.ts`, extend `validateRouteParams` to allowlist `when` (three values) and each `modes` entry (the seven selectable modes), map `when`→`depArr` (`leaveNow`/`leaveAt`→`dep`, `arriveBy`→`arr`) and `modes`→`includedModes`; an explicit all-deselected (empty) `modes` set raises `ValidationError` (omitted `modes` ⇒ include everything)
+    - Update `backend/src/api/routes.integration.test.ts` and add an all-deselected `modes`→400 case
+    - _Requirements: 6.1, 6.3, 6.4, 7.1, 7.2, 7.3, 7.4, 7.5_
+
+- [ ] 19. Implement the frontend time filter, mode selection, and merged-window rendering
+  - [ ] 19.1 Add the controls, update the API client/contract, and wire the search flow
+    - Add `frontend/src/components/TimeFilterControl.tsx` (Leave now default / Leave at / Arrive by, with a datetime input for the latter two) and `frontend/src/components/ModeSelectionControl.tsx` (seven checkboxes, all on by default, all-deselected validation)
+    - Update `frontend/src/api/client.ts` `ApiClient.planRoutes` and `frontend/src/api/types.ts` to carry `when` and `modes`
+    - Update `RouteSearchController` to pass `timeFilter` + Selected_Time + `includedModes` and enforce the all-modes-deselected validation before searching; update `LocationSearchField` to show served modes; update `RouteList` to render the merged window; wire both controls into `App.tsx`
+    - _Requirements: 1.3, 2.2, 6.1, 6.2, 6.4, 7.1, 7.2_
+
+  - [ ]* 19.2 Write unit tests for the new controls and update affected frontend tests
+    - Add tests for `TimeFilterControl` (default Leave now, datetime shown for Leave at / Arrive by) and `ModeSelectionControl` (all on by default, all-deselected validation message); update existing frontend tests affected by the new `planRoutes` signature
+    - _Requirements: 6.1, 6.2, 6.4, 7.1, 7.2_
+
+- [ ] 20. Enhancement checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise. Run the TypeScript typecheck and build, run the full Vitest suite to green, and note that the live smoke test (`backend/src/scripts/smokeTest.ts`) should be re-run manually against the real TfNSW API.
+
+## Enhancement Notes
+
+- Tasks marked with `*` are optional test tasks; the core implementation tasks (14.1, 15.1, 16.1, 17.1, 18.1, 19.1) are not optional.
+- The enhancement property tests reuse the design's correctness properties: Property 15 (prioritisation), Property 16 (mode-exclusion mapping), and Property 4 (merged window). Each must use `fast-check`, run a minimum of 100 iterations, and carry the tag `Feature: tfnsw-route-planner, Property {N}: {text}`.
+- Build order: models first (14), then the independent normaliser (15) and TfNSW client (16) in parallel, then the Route Service window (17) that consumes both, then the REST/middleware mapping (18), then the frontend (19), then the test wave and a final checkpoint (20).
+- Optional test sub-tasks are grouped into a single later wave per the requested ordering; each lives in its own file to avoid write collisions.
+
+## Enhancement Task Dependency Graph
+
+```json
+{
+  "waves": [
+    { "id": 0, "tasks": ["14.1"] },
+    { "id": 1, "tasks": ["15.1", "16.1"] },
+    { "id": 2, "tasks": ["17.1"] },
+    { "id": 3, "tasks": ["18.1"] },
+    { "id": 4, "tasks": ["19.1"] },
+    { "id": 5, "tasks": ["15.2", "15.3", "16.2", "17.2", "19.2"] }
+  ]
+}
+```

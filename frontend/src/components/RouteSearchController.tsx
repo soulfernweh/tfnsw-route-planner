@@ -19,8 +19,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiClient, apiClient as sharedApiClient } from '../api/client';
-import type { Journey, Location, RouteResult } from '../api/types';
+import type { WhenFilter } from '../api/client';
+import type { Journey, Location, RouteResult, SelectableMode } from '../api/types';
 import { RouteList } from './RouteList';
+import { NO_MODES_MESSAGE } from './ModeSelectionControl';
 import '../styles/routes.css';
 
 export interface RouteSearchControllerProps {
@@ -28,8 +30,20 @@ export interface RouteSearchControllerProps {
   origin: Location | null;
   /** The selected destination location, or null if not yet chosen. */
   destination: Location | null;
-  /** ISO 8601 desired departure time. Optional; backend defaults to "now". */
+  /** ISO 8601 desired departure/arrival time. Optional; backend defaults to "now". */
   time?: string;
+  /**
+   * The Time_Filter (Req 7). Defaults to 'leaveNow' when omitted; passed
+   * straight through to `planRoutes`.
+   */
+  when?: WhenFilter;
+  /**
+   * The user's selected transport modes (Req 6). When provided and empty, the
+   * search is blocked and the "at least one transport mode is required"
+   * validation message is shown (Req 6.4). When undefined, no mode filter is
+   * applied (all modes included).
+   */
+  includedModes?: SelectableMode[];
   /** API client override (defaults to the shared client). */
   client?: ApiClient;
   /** Invoked when the user selects a route to view its details (task 11.6). */
@@ -77,6 +91,8 @@ export function RouteSearchController({
   origin,
   destination,
   time,
+  when,
+  includedModes,
   client,
   onSelectJourney,
   onResult,
@@ -88,10 +104,17 @@ export function RouteSearchController({
 
   const searchEnabled = canSearch(origin, destination);
   const sameLocation = isSameLocation(origin, destination);
+  // Req 6.4: an explicit, empty mode selection blocks the search.
+  const noModesSelected =
+    includedModes !== undefined && includedModes.length === 0;
 
   const runSearch = useCallback(async () => {
     if (!origin || !destination || origin.id === destination.id) {
       // Guard: never call the backend for an invalid pair (Req 2.5).
+      return;
+    }
+    if (includedModes !== undefined && includedModes.length === 0) {
+      // Req 6.4: do not search when every transport mode is deselected.
       return;
     }
 
@@ -107,6 +130,8 @@ export function RouteSearchController({
           originId: origin.id,
           destinationId: destination.id,
           ...(time !== undefined ? { time } : {}),
+          ...(when !== undefined ? { when } : {}),
+          ...(includedModes !== undefined ? { modes: includedModes } : {}),
         },
         controller.signal,
       );
@@ -122,7 +147,7 @@ export function RouteSearchController({
       // left untouched, so they are retained for the user (Req 2.6).
       setState({ status: 'error', message: SERVICE_UNAVAILABLE_MESSAGE });
     }
-  }, [origin, destination, time, activeClient]);
+  }, [origin, destination, time, when, includedModes, activeClient]);
 
   // Surface the latest result (or null) to the parent so it can render the
   // comparison and detail views from the already-fetched journeys (Req 5.1,
@@ -158,8 +183,8 @@ export function RouteSearchController({
           type="button"
           className="route-search__button"
           onClick={runSearch}
-          disabled={!searchEnabled || state.status === 'loading'}
-          aria-disabled={!searchEnabled || state.status === 'loading'}
+          disabled={!searchEnabled || noModesSelected || state.status === 'loading'}
+          aria-disabled={!searchEnabled || noModesSelected || state.status === 'loading'}
         >
           {state.status === 'loading' ? 'Searching…' : 'Find routes'}
         </button>
@@ -169,6 +194,12 @@ export function RouteSearchController({
         <p className="route-search__message route-search__message--validation" role="alert">
           Origin and destination cannot be the same. Choose a different
           destination.
+        </p>
+      )}
+
+      {noModesSelected && (
+        <p className="route-search__message route-search__message--validation" role="alert">
+          {NO_MODES_MESSAGE}
         </p>
       )}
 

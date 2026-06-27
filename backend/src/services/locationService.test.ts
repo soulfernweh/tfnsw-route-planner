@@ -47,6 +47,8 @@ const SAMPLE_LOCATION: Location = {
   name: 'Central Station',
   type: 'station',
   suburb: 'Sydney',
+  modes: ['train'],
+  matchQuality: 100,
   coord: { lat: -33.883, lng: 151.206 },
 };
 

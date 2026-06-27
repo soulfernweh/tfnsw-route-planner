@@ -68,6 +68,14 @@
   margin-bottom: var(--space-md);
 }
 
+/* Time filter + mode selection grouped above the search action. */
+.app-search-filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
 /* Comparison + detail stack vertically within the results region. */
 .app-results {
   display: flex;
